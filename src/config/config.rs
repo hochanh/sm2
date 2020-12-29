@@ -1,12 +1,12 @@
-use crate::config::{Conf, InnerConf, NewCardOrder, LeechAction};
+use crate::config::{Config, InnerConfig, NewCardOrder, LeechAction};
 use crate::service::time::Timestamp;
 
-impl Default for Conf {
+impl Default for Config {
     fn default() -> Self {
         Self {
             id: 0,
             name: "".to_string(),
-            inner: InnerConf {
+            inner: InnerConfig {
                 learn_steps: vec![1.0, 10.0],
                 relearn_steps: vec![10.0],
                 cap_answer_time: 60,

@@ -12,7 +12,7 @@ pub enum LeechAction {
     Tag = 1,
 }
 
-pub struct InnerConf {
+pub struct InnerConfig {
     learn_steps: Vec<f32>,
     relearn_steps: Vec<f32>,
 
@@ -43,10 +43,10 @@ pub struct InnerConf {
     leech_threshold: i32,
 }
 
-pub struct Conf {
+pub struct Config {
     pub id: i64,
     pub name: String,
-    pub inner: InnerConf,
+    pub inner: InnerConfig,
     pub modified_at: i64,
     pub inserted_at: i64,
 }

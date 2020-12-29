@@ -1,5 +1,6 @@
 mod card;
 
+#[derive(PartialEq)]
 pub enum CardType {
     New = 0,
     Learn = 1,
@@ -7,6 +8,7 @@ pub enum CardType {
     Relearn = 3,
 }
 
+#[derive(PartialEq)]
 pub enum CardQueue {
     New = 0, // due is the order cards are shown in
     Learn = 1, // due is a unix timestamp
@@ -23,7 +25,7 @@ pub struct Card {
     pub(crate) id: i64,
     pub(crate) card_type: CardType,
     pub(crate) card_queue: CardQueue,
-    pub(crate) due: i32,
+    pub(crate) due: i64,
     pub(crate) interval: u32,
     pub(crate) ease_factor: u16,
     pub(crate) reps: u32,

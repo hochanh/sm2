@@ -1,5 +1,6 @@
 use crate::card::{Card, CardType, CardQueue};
 use crate::service::time::Timestamp;
+use crate::config::INITIAL_EASE_FACTOR;
 
 impl Default for Card {
     fn default() -> Self {
@@ -20,13 +21,28 @@ impl Default for Card {
 }
 
 impl Card {
-    pub fn new(due: i32) -> Self {
+    fn new(due: i64) -> Self {
         let mut card = Card::default();
         card.due = due;
         card
     }
 
-    pub fn set_modified(&mut self, modified_at: i64) {
+    fn set_modified_at(&mut self, modified_at: i64) {
         self.modified_at = modified_at
+    }
+
+    fn schedule_as_new(&mut self, position: i64) {
+        self.due = position as i64;
+        self.card_type = CardType::New;
+        self.card_queue = CardQueue::New;
+        self.interval = 0;
+        self.ease_factor = INITIAL_EASE_FACTOR;
+    }
+
+    fn set_new_position(&mut self, position: i64) {
+        if self.card_queue != CardQueue::New || self.card_type != CardType::New {
+            return;
+        }
+        self.due = position;
     }
 }
