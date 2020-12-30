@@ -1,6 +1,6 @@
-use crate::card::{Card, CardType, CardQueue};
-use crate::service::time::Timestamp;
+use crate::card::{Card, CardQueue, CardType};
 use crate::config::INITIAL_EASE_FACTOR;
+use crate::service::time::Timestamp;
 
 impl Default for Card {
     fn default() -> Self {

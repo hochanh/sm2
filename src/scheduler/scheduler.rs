@@ -1,9 +1,11 @@
+use std::cmp::{max, min};
+
+use rand::Rng;
+
 use crate::card::{Card, CardQueue, CardType};
 use crate::config::{Config, INITIAL_EASE_FACTOR};
-use crate::scheduler::{Choice, SchedulerTrait, Scheduler};
+use crate::scheduler::{Choice, Scheduler, SchedulerTrait};
 use crate::service::time::Timestamp;
-use rand::Rng;
-use std::cmp::{max, min};
 
 impl Scheduler {
 	pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
@@ -76,7 +78,7 @@ impl Scheduler {
 	fn answer_learn_card(&mut self, choice: Choice) {
 		match choice {
 			Choice::Easy => {
-				self.reschedule_as_review(false)
+				self.reschedule_as_review(true)
 			}
 			Choice::Ok => {
 				if self.card.remaining_steps % 1_000 <= 1 {
@@ -124,7 +126,7 @@ impl Scheduler {
 		match self.card.card_type {
 			CardType::Review | CardType::Relearn => {
 				let bonus = if early { 1 } else { 0 };
-				self.card.interval + 1
+				self.card.interval + bonus
 			}
             _ => {
 				let ideal = if early {
@@ -144,7 +146,7 @@ impl Scheduler {
 
 	fn fuzz_interval(interval: i32) -> i32 {
 		match Scheduler::fuzz_interval_range(interval) {
-			(max, min) =>  {
+			(min, max) =>  {
 				let mut rng = rand::thread_rng();
 				rng.gen_range(min..=max)
 			}
@@ -374,7 +376,6 @@ mod tests {
 	use crate::service::time::Timestamp;
 
 	use super::*;
-	use std::sync::mpsc::RecvTimeoutError::Timeout;
 
 	#[test]
 	fn test_new() {
@@ -402,9 +403,43 @@ mod tests {
 		scheduler.answer(Choice::Again);
 		// Got 3 steps before graduation
 		assert_eq!(scheduler.card.remaining_steps % 1_000, 3);
-		assert_eq!((scheduler.card.remaining_steps / 1_000) as i32, 3);
+		assert_eq!(scheduler.card.remaining_steps / 1_000, 3);
 		// Due in 30 seconds
-		let t = scheduler.card.due - Timestamp::now();
-		assert!(t >= 25 && t <= 40);
+		let t1 = scheduler.card.due - Timestamp::now();
+		assert!(t1 >= 25 && t1 <= 40);
+
+		// Pass it once
+		scheduler.answer(Choice::Ok);
+		// Due in 3 minutes
+		let t2 = scheduler.card.due - Timestamp::now();
+		assert!(t2 >= 178 && t2 <= 225);
+		assert_eq!(scheduler.card.remaining_steps % 1_000, 2);
+		assert_eq!(scheduler.card.remaining_steps / 1_000, 2);
+
+		// Pass again
+		scheduler.answer(Choice::Ok);
+		// Due in 10 minutes
+		let t3 = scheduler.card.due - Timestamp::now();
+		assert!(t3 >= 599 && t3 <= 750);
+		assert_eq!(scheduler.card.remaining_steps % 1_000, 1);
+		assert_eq!(scheduler.card.remaining_steps / 1_000, 1);
+
+		// Graduate the card
+		assert!(matches!(scheduler.card.card_type, CardType::Learn));
+		assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+		scheduler.answer(Choice::Ok);
+		assert!(matches!(scheduler.card.card_type, CardType::Review));
+		assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+		// Due tomorrow with interval of 1
+		assert_eq!(scheduler.card.due, scheduler.day_today + 1);
+		assert_eq!(scheduler.card.interval, 1);
+		// Or normal removal
+		scheduler.card.card_type = CardType::New;
+		scheduler.card.card_queue = CardQueue::Learn;
+		scheduler.answer(Choice::Easy);
+		assert!(matches!(scheduler.card.card_type, CardType::Review));
+		assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        let (min, max) = Scheduler::fuzz_interval_range(4);
+		assert!(scheduler.card.interval >= min && scheduler.card.interval <= max);
 	}
 }

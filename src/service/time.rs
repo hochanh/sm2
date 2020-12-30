@@ -1,5 +1,6 @@
 use std::time;
-use chrono::{Date, Duration, FixedOffset, Local, TimeZone, Timelike, DateTime, Utc, Datelike};
+
+use chrono::{DateTime, Duration, FixedOffset, Local, TimeZone, Utc};
 
 pub struct Timestamp(i64);
 
