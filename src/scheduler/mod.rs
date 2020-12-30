@@ -1,8 +1,9 @@
 use crate::card::Card;
 use crate::config::Config;
 
-mod learn;
+mod space;
 
+#[derive(Clone, Copy)]
 pub enum Choice {
     Again = 1,
     Hard = 2,

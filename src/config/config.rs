@@ -7,8 +7,8 @@ impl Default for Config {
             id: 0,
             name: "".to_string(),
             inner: InnerConfig {
-                learn_steps: vec![1.0, 10.0],
-                relearn_steps: vec![10.0],
+                learn_steps: vec![1, 10],
+                relearn_steps: vec![10],
                 cap_answer_time: 60,
                 visible_time: 0,
                 new_per_day: 20,

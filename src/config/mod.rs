@@ -1,6 +1,6 @@
 mod config;
 
-pub const INITIAL_EASE_FACTOR: u16 = 2_500; // 250%
+pub const INITIAL_EASE_FACTOR: i32 = 2_500; // 250%
 
 pub enum NewCardOrder {
     Due = 0,
@@ -13,34 +13,34 @@ pub enum LeechAction {
 }
 
 pub struct InnerConfig {
-    learn_steps: Vec<f32>,
-    relearn_steps: Vec<f32>,
+    pub learn_steps: Vec<u32>,
+    pub relearn_steps: Vec<u32>,
 
-    cap_answer_time: i32,
-    visible_time: i32,
+    pub cap_answer_time: i32,
+    pub visible_time: i32,
 
-    new_per_day: i32,
-    reviews_per_day: i32,
+    pub new_per_day: i32,
+    pub reviews_per_day: i32,
 
-    bury_new: bool,
-    bury_reviews: bool,
+    pub bury_new: bool,
+    pub bury_reviews: bool,
 
-    initial_ease: f32,
+    pub initial_ease: f32,
 
-    easy_multiplier: f32,
-    hard_multiplier: f32,
-    lapse_multiplier: f32,
-    interval_multiplier: f32,
+    pub easy_multiplier: f32,
+    pub hard_multiplier: f32,
+    pub lapse_multiplier: f32,
+    pub interval_multiplier: f32,
 
-    maximum_review_interval: i32,
-    minimum_review_interval: i32,
+    pub maximum_review_interval: i32,
+    pub minimum_review_interval: i32,
 
-    graduating_interval_good: i32,
-    graduating_interval_easy: i32,
+    pub graduating_interval_good: i32,
+    pub graduating_interval_easy: i32,
 
-    new_card_order: NewCardOrder,
-    leech_action: LeechAction,
-    leech_threshold: i32,
+    pub new_card_order: NewCardOrder,
+    pub leech_action: LeechAction,
+    pub leech_threshold: i32,
 }
 
 pub struct Config {
