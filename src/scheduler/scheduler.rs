@@ -1,18 +1,11 @@
 use crate::card::{Card, CardQueue, CardType};
 use crate::config::{Config, INITIAL_EASE_FACTOR};
-use crate::scheduler::{Choice, Scheduler};
+use crate::scheduler::{Choice, SchedulerTrait, Scheduler};
 use crate::service::time::Timestamp;
 use rand::Rng;
 use std::cmp::{max, min};
 
-pub struct Space {
-	card: Card,
-	config: Config,
-	day_cut_off: i64,
-	day_today: i64,
-}
-
-impl Space {
+impl Scheduler {
 	pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
 		Self {
 			card,
@@ -23,7 +16,17 @@ impl Space {
 	}
 }
 
-impl Space {
+impl SchedulerTrait for Scheduler {
+	fn answer_card(&mut self, choice: Choice) {
+		self.answer(choice);
+	}
+
+	fn reset_card(&mut self) {
+		unimplemented!()
+	}
+}
+
+impl Scheduler {
 	fn answer(&mut self, choice: Choice) {
 		self.card.reps += 1;
 
@@ -46,8 +49,8 @@ impl Space {
 
 	fn start_remaining_steps(&mut self) -> i32 {
 		let steps = match self.card.card_type {
-			CardType::Relearn => &self.config.inner.relearn_steps,
-			_ => &self.config.inner.learn_steps,
+			CardType::Relearn => &self.config.srs_config.relearn_steps,
+			_ => &self.config.srs_config.learn_steps,
 		};
 
 		let total_steps = steps.len();
@@ -55,13 +58,13 @@ impl Space {
 		return total_steps as i32 + total_remaining * 1_000
 	}
 
-	// "The number of steps that can be completed by the day cutoff."
-	fn remaining_today(&self, steps: &Vec<u32>, remaining: usize) -> i32 {
+	// The number of steps that can be completed by the day cutoff
+	fn remaining_today(&self, steps: &Vec<f32>, remaining: usize) -> i32 {
 		let mut now = Timestamp::now();
 		let remaining_steps = &steps[steps.len() - remaining..steps.len()];
 		let mut remain = 0;
 		for i in 0..remaining_steps.len() {
-			now += (remaining_steps[i] * 60) as i64;
+			now += (remaining_steps[i] * 60.0) as i64;
 			if now > self.day_cut_off {
 				break
 			}
@@ -101,7 +104,7 @@ impl Space {
 	}
 
 	fn reschedule_graduating_lapse(&mut self, early: bool) {
-		if (early) {
+		if early {
 			self.card.interval += 1
 		}
 		self.card.due = self.day_today + self.card.interval as i64;
@@ -125,13 +128,13 @@ impl Space {
 			}
             _ => {
 				let ideal = if early {
-					self.config.inner.graduating_interval_easy
+					self.config.srs_config.graduating_interval_easy
 				} else {
-					self.config.inner.graduating_interval_good
+					self.config.srs_config.graduating_interval_good
 				};
 
 				if fuzzy {
-					Space::fuzz_interval(ideal)
+					Scheduler::fuzz_interval(ideal)
 				} else {
 					ideal
 				}
@@ -140,7 +143,7 @@ impl Space {
 	}
 
 	fn fuzz_interval(interval: i32) -> i32 {
-		match Space::fuzz_interval_range(interval) {
+		match Scheduler::fuzz_interval_range(interval) {
 			(max, min) =>  {
 				let mut rng = rand::thread_rng();
 				rng.gen_range(min..=max)
@@ -198,7 +201,7 @@ impl Space {
 
 		match choice {
 			Choice::Hard => {
-				factor = self.config.inner.hard_multiplier;
+				factor = self.config.srs_config.hard_multiplier;
 				min_new_interval = (factor / 2.0) as i32;
 			}
 			Choice::Ok => {
@@ -206,7 +209,7 @@ impl Space {
 			}
 			_ => {
 				factor = self.card.ease_factor as f32 / 1_000.0;
-				let bonus = self.config.inner.easy_multiplier;
+				let bonus = self.config.srs_config.easy_multiplier;
 				easy_bonus = bonus - (bonus - 1.0) / 2.0
 			}
 		}
@@ -217,12 +220,12 @@ impl Space {
 	}
 
 	fn constrain_interval(&self, interval: f32, previous: i32, fuzzy: bool) -> i32 {
-		let mut interval = (interval * self.config.inner.interval_multiplier) as i32;
+		let mut interval = (interval * self.config.srs_config.interval_multiplier) as i32;
 		if fuzzy {
-			interval= Space::fuzz_interval(interval);
+			interval= Scheduler::fuzz_interval(interval);
 		}
 		interval = max(max(interval as i32, previous + 1), 1);
-		min(interval, self.config.inner.maximum_review_interval)
+		min(interval, self.config.srs_config.maximum_review_interval)
 	}
 
 	fn update_review_interval(&mut self, choice: Choice) {
@@ -232,7 +235,7 @@ impl Space {
 	fn next_review_interval(&self, choice: Choice, fuzzy: bool) -> i32 {
 		let factor = self.card.ease_factor / 1_000;
 		let delay = self.days_late();
-		let hard_factor = self.config.inner.hard_multiplier;
+		let hard_factor = self.config.srs_config.hard_multiplier;
 		let hard_min = if hard_factor > 1.0 {
 			self.card.interval
 		} else {
@@ -255,7 +258,7 @@ impl Space {
 		}
 
 		self.constrain_interval(
-			((self.card.interval + delay) * factor) as f32 * self.config.inner.easy_multiplier,
+			((self.card.interval + delay) * factor) as f32 * self.config.srs_config.easy_multiplier,
 			interval,
 			fuzzy
 		)
@@ -267,7 +270,7 @@ impl Space {
 
 		let suspended = self.check_leech() && matches!(self.card.card_queue, CardQueue::Suspended);
 
-		if !self.config.inner.learn_steps.is_empty() && !suspended {
+		if !self.config.srs_config.learn_steps.is_empty() && !suspended {
 			self.card.card_type = CardType::Relearn;
 		} else {
 			self.update_review_interval_on_fail();
@@ -285,12 +288,12 @@ impl Space {
 
 	fn lapse_interval(&self) -> i32 {
 		max(1,
-			max(self.config.inner.minimum_review_interval,
-				(self.card.interval as f32 * self.config.inner.lapse_multiplier) as i32))
+			max(self.config.srs_config.minimum_review_interval,
+				(self.card.interval as f32 * self.config.srs_config.lapse_multiplier) as i32))
 	}
 
 	fn check_leech(&self) -> bool {
-		let lt = self.config.inner.leech_threshold;
+		let lt = self.config.srs_config.leech_threshold;
 		if lt == 0 {
 			false
 		} else if self.card.lapses >= lt && (self.card.lapses - lt) % (max(lt / 2, 1)) == 0 {
@@ -307,7 +310,7 @@ impl Space {
 	fn move_to_next_step(&mut self) {
 		let remaining = (self.card.remaining_steps % 1_000) - 1;
 		self.card.remaining_steps = self.remaining_today(
-			&self.config.inner.learn_steps, remaining as usize) * 1_000 + remaining;
+			&self.config.srs_config.learn_steps, remaining as usize) * 1_000 + remaining;
 
 		self.reschedule_learn_card(None);
 	}
@@ -317,7 +320,7 @@ impl Space {
 		self.reschedule_learn_card(Some(delay))
 	}
 
-	fn reschedule_learn_card(&mut self, delay: Option<u32>) {
+	fn reschedule_learn_card(&mut self, delay: Option<i32>) {
 		let delay = match delay {
 			None => self.delay_for_repeating_grade(self.card.remaining_steps),
 			Some(value) => value,
@@ -338,9 +341,9 @@ impl Space {
 		}
 	}
 
-	fn delay_for_repeating_grade(&self, remaining: i32) -> u32 {
+	fn delay_for_repeating_grade(&self, remaining: i32) -> i32 {
 		let delay1 = self.delay_for_grade(remaining);
-		let delay2 = if !self.config.inner.relearn_steps.is_empty() {
+		let delay2 = if !self.config.srs_config.relearn_steps.is_empty() {
 			self.delay_for_grade(remaining)
 		} else {
 			delay1 * 2
@@ -348,11 +351,11 @@ impl Space {
 		(delay1 + max(delay1, delay2)) / 2
 	}
 
-	fn delay_for_grade(&self, remaining: i32) -> u32 {
+	fn delay_for_grade(&self, remaining: i32) -> i32 {
 		let left = remaining % 1_000;
-        let index = self.config.inner.learn_steps.len() - left as usize;
-		let delay = self.config.inner.learn_steps[index];
-       	delay * 60
+        let index = self.config.srs_config.learn_steps.len() - left as usize;
+		let delay = self.config.srs_config.learn_steps[index];
+		(delay * 60.0) as i32
 	}
 
 	fn move_to_first_step(&mut self) {
@@ -364,31 +367,6 @@ impl Space {
 	}
 }
 
-impl Scheduler for Space {
-	fn answer_card(&mut self, choice: Choice) {
-		self.answer(choice);
-	}
-
-	fn next_interval(&self, choice: Choice) -> u32 {
-		unimplemented!()
-	}
-
-	fn bury_card(&mut self) {
-		unimplemented!()
-	}
-
-	fn unbury_card(&mut self) {
-		unimplemented!()
-	}
-
-	fn schedule_as_new(&mut self) {
-		unimplemented!()
-	}
-
-	fn schedule_as_review(&mut self, min_interval: u32, max_interval: u32) {
-		unimplemented!()
-	}
-}
 
 #[cfg(test)]
 mod tests {
@@ -396,17 +374,37 @@ mod tests {
 	use crate::service::time::Timestamp;
 
 	use super::*;
+	use std::sync::mpsc::RecvTimeoutError::Timeout;
 
 	#[test]
 	fn test_new() {
-		let mut space = Space::new(
+		let mut scheduler = Scheduler::new(
 			Card::default(),
 			Config::default(),
 			Timestamp::day_cut_off(),
 		);
-		space.answer_card(Choice::Again);
-		assert!(matches!(space.card.card_queue, CardQueue::Learn));
-		assert!(matches!(space.card.card_type, CardType::Learn));
-		assert!(space.card.due >= Timestamp::now() / 86_400);
+		scheduler.answer_card(Choice::Again);
+		assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+		assert!(matches!(scheduler.card.card_type, CardType::Learn));
+		assert!(scheduler.card.due >= Timestamp::now());
+	}
+
+	#[test]
+	fn test_learn() {
+		let mut scheduler = Scheduler::new(
+			Card::default(),
+			Config::default(),
+			Timestamp::day_cut_off(),
+		);
+
+		// Fail it
+        scheduler.config.srs_config.learn_steps = vec![0.5, 3.0, 10.0];
+		scheduler.answer(Choice::Again);
+		// Got 3 steps before graduation
+		assert_eq!(scheduler.card.remaining_steps % 1_000, 3);
+		assert_eq!((scheduler.card.remaining_steps / 1_000) as i32, 3);
+		// Due in 30 seconds
+		let t = scheduler.card.due - Timestamp::now();
+		assert!(t >= 25 && t <= 40);
 	}
 }

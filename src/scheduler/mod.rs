@@ -1,7 +1,7 @@
 use crate::card::Card;
 use crate::config::Config;
 
-mod space;
+mod scheduler;
 
 #[derive(Clone, Copy)]
 pub enum Choice {
@@ -11,13 +11,14 @@ pub enum Choice {
     Easy = 4,
 }
 
-trait Scheduler {
+trait SchedulerTrait {
     fn answer_card(&mut self, choice: Choice);
-    fn next_interval(&self, choice: Choice) -> u32;
+    fn reset_card(&mut self);
+}
 
-    fn bury_card(&mut self);
-    fn unbury_card(&mut self);
-
-    fn schedule_as_new(&mut self);
-    fn schedule_as_review(&mut self, min_interval: u32, max_interval: u32);
+pub struct Scheduler {
+	card: Card,
+	config: Config,
+	day_cut_off: i64,
+	day_today: i64,
 }

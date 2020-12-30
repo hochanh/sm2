@@ -1,4 +1,4 @@
-use crate::config::{Config, InnerConfig, NewCardOrder, LeechAction};
+use crate::config::{Config, SrsConfig, NewCardOrder, LeechAction};
 use crate::service::time::Timestamp;
 
 impl Default for Config {
@@ -6,9 +6,9 @@ impl Default for Config {
         Self {
             id: 0,
             name: "".to_string(),
-            inner: InnerConfig {
-                learn_steps: vec![1, 10],
-                relearn_steps: vec![10],
+            srs_config: SrsConfig {
+                learn_steps: vec![1.0, 10.0],
+                relearn_steps: vec![10.0],
                 cap_answer_time: 60,
                 visible_time: 0,
                 new_per_day: 20,

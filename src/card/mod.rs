@@ -12,8 +12,8 @@ pub enum CardType {
 pub enum CardQueue {
     New = 0, // due is the order cards are shown in
     Learn = 1, // due is a unix timestamp
-    Review = 2, // due is days since creation date
-    DayLearn = 3, // due is days since creation date
+    Review = 2, // due is days since epoch
+    DayLearn = 3, // due is days since epoch
 
     /// cards are not due in these states
     Suspended = -1,
