@@ -17,8 +17,8 @@ trait SchedulerTrait {
 }
 
 pub struct Scheduler {
-	card: Card,
-	config: Config,
-	day_cut_off: i64,
-	day_today: i64,
+    card: Card,
+    config: Config,
+    day_cut_off: i64,
+    day_today: i64,
 }

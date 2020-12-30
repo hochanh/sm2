@@ -9,3 +9,8 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 rand = "0.8"
+
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false
+features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy", "run-cargo-fmt"]

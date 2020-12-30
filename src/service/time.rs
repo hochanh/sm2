@@ -14,7 +14,8 @@ impl Timestamp {
             now().as_secs() as i64,
             local_minutes_west_for_stamp(Utc::now().timestamp()),
             4,
-        ).timestamp()
+        )
+        .timestamp()
     }
 }
 
@@ -36,7 +37,7 @@ pub fn get_next_day(now_secs: i64, now_mins_west: i32, rollover_hour: u8) -> Dat
     let rollover_passed = rollover_today_datetime <= now_datetime;
 
     if rollover_passed {
-        (rollover_today_datetime + Duration::days(1))
+        rollover_today_datetime + Duration::days(1)
     } else {
         rollover_today_datetime
     }

@@ -26,10 +26,10 @@ impl Default for Config {
                 graduating_interval_easy: 4,
                 new_card_order: NewCardOrder::Due,
                 leech_action: LeechAction::Suspend,
-                leech_threshold: 8
+                leech_threshold: 8,
             },
             modified_at: Timestamp::now(),
-            inserted_at: Timestamp::now()
+            inserted_at: Timestamp::now(),
         }
     }
 }
