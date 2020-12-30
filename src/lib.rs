@@ -1,4 +1,4 @@
 pub mod card;
-pub mod config;
-pub mod scheduler;
+pub mod conf;
+pub mod sched;
 pub mod service;

@@ -3,8 +3,8 @@ use std::cmp::{max, min};
 use rand::Rng;
 
 use crate::card::{Card, CardQueue, CardType};
-use crate::config::{Config, INITIAL_EASE_FACTOR};
-use crate::scheduler::{Choice, Scheduler, SchedulerTrait};
+use crate::conf::{Config, INITIAL_EASE_FACTOR};
+use crate::sched::{Choice, Sched, Scheduler};
 use crate::service::time::Timestamp;
 
 impl Scheduler {
@@ -18,7 +18,7 @@ impl Scheduler {
     }
 }
 
-impl SchedulerTrait for Scheduler {
+impl Sched for Scheduler {
     fn answer_card(&mut self, choice: Choice) {
         self.answer(choice);
     }
@@ -61,12 +61,12 @@ impl Scheduler {
     }
 
     // The number of steps that can be completed by the day cutoff
-    fn remaining_today(&self, steps: &Vec<f32>, remaining: usize) -> i32 {
+    fn remaining_today(&self, steps: &[f32], remaining: usize) -> i32 {
         let mut now = Timestamp::now();
         let remaining_steps = &steps[steps.len() - remaining..steps.len()];
         let mut remain = 0;
-        for i in 0..remaining_steps.len() {
-            now += (remaining_steps[i] * 60.0) as i64;
+        for (i, item) in remaining_steps.iter().enumerate() {
+            now += (item * 60.0) as i64;
             if now > self.day_cut_off {
                 break;
             }
@@ -137,12 +137,9 @@ impl Scheduler {
     }
 
     fn fuzz_interval(interval: i32) -> i32 {
-        match Scheduler::fuzz_interval_range(interval) {
-            (min, max) => {
-                let mut rng = rand::thread_rng();
-                rng.gen_range(min..=max)
-            }
-        }
+        let (min, max) = Scheduler::fuzz_interval_range(interval);
+        let mut rng = rand::thread_rng();
+        rng.gen_range(min..=max)
     }
 
     fn fuzz_interval_range(interval: i32) -> (i32, i32) {
@@ -194,7 +191,7 @@ impl Scheduler {
 
         let mut easy_bonus = 1.0;
         let mut min_new_interval = 1;
-        let mut factor = 0.0;
+        let factor: f32;
 
         match choice {
             Choice::Hard => {
@@ -266,8 +263,9 @@ impl Scheduler {
 
         let suspended = self.check_leech() && matches!(self.card.card_queue, CardQueue::Suspended);
 
-        if !self.config.srs_config.learn_steps.is_empty() && !suspended {
+        if !self.config.srs_config.relearn_steps.is_empty() && !suspended {
             self.card.card_type = CardType::Relearn;
+            self.move_to_first_step();
         } else {
             self.update_review_interval_on_fail();
             self.reschedule_as_review(false);
@@ -359,10 +357,10 @@ impl Scheduler {
 
     fn move_to_first_step(&mut self) {
         self.card.remaining_steps = self.start_remaining_steps();
-        match self.card.card_type {
-            CardType::Relearn => self.update_review_interval_on_fail(),
-            _ => self.reschedule_learn_card(None),
+        if matches!(self.card.card_type, CardType::Relearn) {
+            self.update_review_interval_on_fail()
         }
+        self.reschedule_learn_card(None)
     }
 }
 
@@ -431,5 +429,31 @@ mod tests {
         assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
         let (min, max) = Scheduler::fuzz_interval_range(4);
         assert!(scheduler.card.interval >= min && scheduler.card.interval <= max);
+    }
+
+    #[test]
+    fn test_relearn() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        scheduler.card.interval = 100;
+        scheduler.card.due = scheduler.day_today;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.card_type = CardType::Review;
+
+        // Fail the card
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+        assert_eq!(scheduler.card.interval, 1);
+
+        // Immediately graduate it
+        scheduler.answer(Choice::Easy);
+        assert!(matches!(scheduler.card.card_type, CardType::Review));
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert_eq!(scheduler.card.interval, 2);
+        assert_eq!(
+            scheduler.card.due,
+            scheduler.day_today + scheduler.card.interval as i64
+        );
     }
 }

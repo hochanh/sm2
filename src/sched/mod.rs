@@ -1,5 +1,5 @@
 use crate::card::Card;
-use crate::config::Config;
+use crate::conf::Config;
 
 mod scheduler;
 
@@ -11,7 +11,7 @@ pub enum Choice {
     Easy = 4,
 }
 
-trait SchedulerTrait {
+trait Sched {
     fn answer_card(&mut self, choice: Choice);
     fn reset_card(&mut self);
 }
