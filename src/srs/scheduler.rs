@@ -2,10 +2,9 @@ use std::cmp::{max, min};
 
 use rand::Rng;
 
-use crate::card::{Card, CardQueue, CardType};
-use crate::conf::{Config, INITIAL_EASE_FACTOR};
-use crate::sched::{Choice, Sched, Scheduler};
 use crate::service::time::Timestamp;
+use crate::srs::{Card, CardQueue, CardType, Choice, Sched, Scheduler};
+use crate::srs::{Config, INITIAL_EASE_FACTOR};
 
 impl Scheduler {
     pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
@@ -366,8 +365,8 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use crate::card::CardType;
     use crate::service::time::Timestamp;
+    use crate::srs::CardType;
 
     use super::*;
 

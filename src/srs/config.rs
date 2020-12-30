@@ -1,5 +1,5 @@
-use crate::conf::{Config, LeechAction, NewCardOrder, SrsConfig};
 use crate::service::time::Timestamp;
+use crate::srs::{Config, LeechAction, NewCardOrder, SrsConfig};
 
 impl Default for Config {
     fn default() -> Self {
