@@ -62,12 +62,18 @@ impl Scheduler {
 
     // The number of steps that can be completed by the day cutoff
     fn remaining_today(&self, steps: &[f32], remaining: usize) -> i32 {
-        let mut now = Timestamp::now();
-        let remaining_steps = &steps[steps.len() - remaining..steps.len()];
+        let mut now = Timestamp::now() as f32;
+        let from_idx = if steps.len() > remaining {
+            steps.len() - remaining
+        } else {
+            0
+        };
+        let remaining_steps = &steps[from_idx..steps.len()];
         let mut remain = 0;
+        let day_cut_off = self.day_cut_off as f32;
         for (i, item) in remaining_steps.iter().enumerate() {
-            now += (item * 60.0) as i64;
-            if now > self.day_cut_off {
+            now += item * 60.0;
+            if now > day_cut_off {
                 break;
             }
             remain = i
@@ -76,17 +82,18 @@ impl Scheduler {
     }
 
     fn answer_learn_card(&mut self, choice: Choice) {
+        let steps = &self.config.learn_steps.clone();
         match choice {
             Choice::Easy => self.reschedule_as_review(true),
             Choice::Ok => {
                 if self.card.remaining_steps % 1_000 <= 1 {
                     self.reschedule_as_review(false)
                 } else {
-                    self.move_to_next_step()
+                    self.move_to_next_step(steps)
                 }
             }
-            Choice::Hard => self.repeat_step(),
-            Choice::Again => self.move_to_first_step(),
+            Choice::Hard => self.repeat_step(steps),
+            Choice::Again => self.move_to_first_step(steps),
         }
     }
 
@@ -263,9 +270,10 @@ impl Scheduler {
 
         let suspended = self.check_leech() && matches!(self.card.card_queue, CardQueue::Suspended);
 
-        if !self.config.relearn_steps.is_empty() && !suspended {
+        let steps = &self.config.relearn_steps.clone();
+        if !steps.is_empty() && !suspended {
             self.card.card_type = CardType::Relearn;
-            self.move_to_first_step();
+            self.move_to_first_step(steps);
         } else {
             self.update_review_interval_on_fail();
             self.reschedule_as_review(false);
@@ -303,22 +311,22 @@ impl Scheduler {
         max(0, self.day_today - self.card.due) as i32
     }
 
-    fn move_to_next_step(&mut self) {
+    fn move_to_next_step(&mut self, steps: &[f32]) {
         let remaining = (self.card.remaining_steps % 1_000) - 1;
         self.card.remaining_steps =
-            self.remaining_today(&self.config.learn_steps, remaining as usize) * 1_000 + remaining;
+            self.remaining_today(steps, remaining as usize) * 1_000 + remaining;
 
-        self.reschedule_learn_card(None);
+        self.reschedule_learn_card(steps, None);
     }
 
-    fn repeat_step(&mut self) {
-        let delay = self.delay_for_repeating_grade(self.card.remaining_steps);
-        self.reschedule_learn_card(Some(delay))
+    fn repeat_step(&mut self, steps: &[f32]) {
+        let delay = self.delay_for_repeating_grade(steps, self.card.remaining_steps);
+        self.reschedule_learn_card(steps, Some(delay))
     }
 
-    fn reschedule_learn_card(&mut self, delay: Option<i32>) {
+    fn reschedule_learn_card(&mut self, steps: &[f32], delay: Option<i32>) {
         let delay = match delay {
-            None => self.delay_for_repeating_grade(self.card.remaining_steps),
+            None => self.delay_for_grade(steps, self.card.remaining_steps),
             Some(value) => value,
         };
 
@@ -337,29 +345,34 @@ impl Scheduler {
         }
     }
 
-    fn delay_for_repeating_grade(&self, remaining: i32) -> i32 {
-        let delay1 = self.delay_for_grade(remaining);
-        let delay2 = if !self.config.relearn_steps.is_empty() {
-            self.delay_for_grade(remaining)
+    fn delay_for_repeating_grade(&self, steps: &[f32], remaining: i32) -> i32 {
+        let delay1 = self.delay_for_grade(steps, remaining);
+        let delay2 = if steps.len() > 1 {
+            self.delay_for_grade(steps, remaining - 1)
         } else {
             delay1 * 2
         };
         (delay1 + max(delay1, delay2)) / 2
     }
 
-    fn delay_for_grade(&self, remaining: i32) -> i32 {
-        let left = remaining % 1_000;
-        let index = self.config.learn_steps.len() - left as usize;
-        let delay = self.config.learn_steps[index];
+    fn delay_for_grade(&self, steps: &[f32], remaining: i32) -> i32 {
+        let left = (remaining % 1_000) as usize;
+        let delay = if steps.is_empty() {
+            1.0
+        } else if steps.len() >= left {
+            steps[steps.len() - left]
+        } else {
+            steps[0]
+        };
         (delay * 60.0) as i32
     }
 
-    fn move_to_first_step(&mut self) {
+    fn move_to_first_step(&mut self, steps: &[f32]) {
         self.card.remaining_steps = self.start_remaining_steps();
         if matches!(self.card.card_type, CardType::Relearn) {
             self.update_review_interval_on_fail()
         }
-        self.reschedule_learn_card(None)
+        self.reschedule_learn_card(steps, None)
     }
 }
 
@@ -378,6 +391,16 @@ mod tests {
         assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
         assert!(matches!(scheduler.card.card_type, CardType::Learn));
         assert!(scheduler.card.due >= Timestamp::now());
+    }
+
+    #[test]
+    fn test_change_steps() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        scheduler.config.learn_steps = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        scheduler.answer(Choice::Ok);
+        scheduler.config.learn_steps = vec![1.0];
+        scheduler.answer(Choice::Ok);
     }
 
     #[test]
