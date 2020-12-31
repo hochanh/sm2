@@ -455,4 +455,20 @@ mod tests {
             scheduler.day_today + scheduler.card.interval as i64
         );
     }
+
+    #[test]
+    fn test_relearn_no_steps() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        scheduler.card.interval = 100;
+        scheduler.card.due = scheduler.day_today;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.card_type = CardType::Review;
+
+        scheduler.config.relearn_steps = vec![];
+        // Fail the card
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.card_type, CardType::Review));
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+    }
 }
