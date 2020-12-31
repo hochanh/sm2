@@ -4,7 +4,6 @@ use crate::srs::{Card, CardQueue, CardType, INITIAL_EASE_FACTOR};
 impl Default for Card {
     fn default() -> Self {
         Self {
-            id: 0,
             card_type: CardType::New,
             card_queue: CardQueue::New,
             due: 0,
@@ -13,8 +12,6 @@ impl Default for Card {
             reps: 0,
             lapses: 0,
             remaining_steps: 0,
-            modified_at: Timestamp::now(),
-            inserted_at: Timestamp::now(),
         }
     }
 }
@@ -24,10 +21,6 @@ impl Card {
         let mut card = Card::default();
         card.due = due;
         card
-    }
-
-    fn set_modified_at(&mut self, modified_at: i64) {
-        self.modified_at = modified_at
     }
 
     fn schedule_as_new(&mut self, position: i64) {

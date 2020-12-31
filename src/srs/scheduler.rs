@@ -3,8 +3,9 @@ use std::cmp::{max, min};
 use rand::Rng;
 
 use crate::service::time::Timestamp;
-use crate::srs::{Card, CardQueue, CardType, Choice, Sched, Scheduler};
-use crate::srs::{Config, INITIAL_EASE_FACTOR};
+use crate::srs::{
+    Card, CardQueue, CardType, Choice, Config, Sched, Scheduler, INITIAL_EASE_FACTOR,
+};
 
 impl Scheduler {
     pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
@@ -50,8 +51,8 @@ impl Scheduler {
 
     fn start_remaining_steps(&mut self) -> i32 {
         let steps = match self.card.card_type {
-            CardType::Relearn => &self.config.srs_config.relearn_steps,
-            _ => &self.config.srs_config.learn_steps,
+            CardType::Relearn => &self.config.relearn_steps,
+            _ => &self.config.learn_steps,
         };
 
         let total_steps = steps.len();
@@ -121,9 +122,9 @@ impl Scheduler {
             }
             _ => {
                 let ideal = if early {
-                    self.config.srs_config.graduating_interval_easy
+                    self.config.graduating_interval_easy
                 } else {
-                    self.config.srs_config.graduating_interval_good
+                    self.config.graduating_interval_good
                 };
 
                 if fuzzy {
@@ -194,7 +195,7 @@ impl Scheduler {
 
         match choice {
             Choice::Hard => {
-                factor = self.config.srs_config.hard_multiplier;
+                factor = self.config.hard_multiplier;
                 min_new_interval = (factor / 2.0) as i32;
             }
             Choice::Ok => {
@@ -202,7 +203,7 @@ impl Scheduler {
             }
             _ => {
                 factor = self.card.ease_factor as f32 / 1_000.0;
-                let bonus = self.config.srs_config.easy_multiplier;
+                let bonus = self.config.easy_multiplier;
                 easy_bonus = bonus - (bonus - 1.0) / 2.0
             }
         }
@@ -213,12 +214,12 @@ impl Scheduler {
     }
 
     fn constrain_interval(&self, interval: f32, previous: i32, fuzzy: bool) -> i32 {
-        let mut interval = (interval * self.config.srs_config.interval_multiplier) as i32;
+        let mut interval = (interval * self.config.interval_multiplier) as i32;
         if fuzzy {
             interval = Scheduler::fuzz_interval(interval);
         }
         interval = max(max(interval as i32, previous + 1), 1);
-        min(interval, self.config.srs_config.maximum_review_interval)
+        min(interval, self.config.maximum_review_interval)
     }
 
     fn update_review_interval(&mut self, choice: Choice) {
@@ -228,7 +229,7 @@ impl Scheduler {
     fn next_review_interval(&self, choice: Choice, fuzzy: bool) -> i32 {
         let factor = self.card.ease_factor / 1_000;
         let delay = self.days_late();
-        let hard_factor = self.config.srs_config.hard_multiplier;
+        let hard_factor = self.config.hard_multiplier;
         let hard_min = if hard_factor > 1.0 {
             self.card.interval
         } else {
@@ -250,7 +251,7 @@ impl Scheduler {
         }
 
         self.constrain_interval(
-            ((self.card.interval + delay) * factor) as f32 * self.config.srs_config.easy_multiplier,
+            ((self.card.interval + delay) * factor) as f32 * self.config.easy_multiplier,
             interval,
             fuzzy,
         )
@@ -262,7 +263,7 @@ impl Scheduler {
 
         let suspended = self.check_leech() && matches!(self.card.card_queue, CardQueue::Suspended);
 
-        if !self.config.srs_config.relearn_steps.is_empty() && !suspended {
+        if !self.config.relearn_steps.is_empty() && !suspended {
             self.card.card_type = CardType::Relearn;
             self.move_to_first_step();
         } else {
@@ -283,14 +284,14 @@ impl Scheduler {
         max(
             1,
             max(
-                self.config.srs_config.minimum_review_interval,
-                (self.card.interval as f32 * self.config.srs_config.lapse_multiplier) as i32,
+                self.config.minimum_review_interval,
+                (self.card.interval as f32 * self.config.lapse_multiplier) as i32,
             ),
         )
     }
 
     fn check_leech(&self) -> bool {
-        let lt = self.config.srs_config.leech_threshold;
+        let lt = self.config.leech_threshold;
         if lt == 0 {
             false
         } else {
@@ -305,8 +306,7 @@ impl Scheduler {
     fn move_to_next_step(&mut self) {
         let remaining = (self.card.remaining_steps % 1_000) - 1;
         self.card.remaining_steps =
-            self.remaining_today(&self.config.srs_config.learn_steps, remaining as usize) * 1_000
-                + remaining;
+            self.remaining_today(&self.config.learn_steps, remaining as usize) * 1_000 + remaining;
 
         self.reschedule_learn_card(None);
     }
@@ -339,7 +339,7 @@ impl Scheduler {
 
     fn delay_for_repeating_grade(&self, remaining: i32) -> i32 {
         let delay1 = self.delay_for_grade(remaining);
-        let delay2 = if !self.config.srs_config.relearn_steps.is_empty() {
+        let delay2 = if !self.config.relearn_steps.is_empty() {
             self.delay_for_grade(remaining)
         } else {
             delay1 * 2
@@ -349,8 +349,8 @@ impl Scheduler {
 
     fn delay_for_grade(&self, remaining: i32) -> i32 {
         let left = remaining % 1_000;
-        let index = self.config.srs_config.learn_steps.len() - left as usize;
-        let delay = self.config.srs_config.learn_steps[index];
+        let index = self.config.learn_steps.len() - left as usize;
+        let delay = self.config.learn_steps[index];
         (delay * 60.0) as i32
     }
 
@@ -386,7 +386,7 @@ mod tests {
             Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
 
         // Fail it
-        scheduler.config.srs_config.learn_steps = vec![0.5, 3.0, 10.0];
+        scheduler.config.learn_steps = vec![0.5, 3.0, 10.0];
         scheduler.answer(Choice::Again);
         // Got 3 steps before graduation
         assert_eq!(scheduler.card.remaining_steps % 1_000, 3);

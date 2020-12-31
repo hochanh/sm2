@@ -29,7 +29,6 @@ pub enum CardQueue {
 }
 
 pub struct Card {
-    pub(crate) id: i64,
     pub(crate) card_type: CardType,
     pub(crate) card_queue: CardQueue,
     pub(crate) due: i64,
@@ -38,8 +37,6 @@ pub struct Card {
     pub(crate) reps: i32,
     pub(crate) lapses: i32,
     pub(crate) remaining_steps: i32,
-    pub(crate) modified_at: i64,
-    pub(crate) inserted_at: i64,
 }
 
 pub enum NewCardOrder {
@@ -52,7 +49,7 @@ pub enum LeechAction {
     Tag = 1,
 }
 
-pub struct SrsConfig {
+pub struct Config {
     pub learn_steps: Vec<f32>,
     pub relearn_steps: Vec<f32>,
 
@@ -81,14 +78,6 @@ pub struct SrsConfig {
     pub new_card_order: NewCardOrder,
     pub leech_action: LeechAction,
     pub leech_threshold: i32,
-}
-
-pub struct Config {
-    pub id: i64,
-    pub name: String,
-    pub srs_config: SrsConfig,
-    pub modified_at: i64,
-    pub inserted_at: i64,
 }
 
 #[derive(Clone, Copy)]
