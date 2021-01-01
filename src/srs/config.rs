@@ -1,4 +1,3 @@
-use crate::service::time::Timestamp;
 use crate::srs::{Config, LeechAction, NewCardOrder};
 
 impl Default for Config {

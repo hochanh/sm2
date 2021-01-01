@@ -1,4 +1,3 @@
-use crate::service::time::Timestamp;
 use crate::srs::{Card, CardQueue, CardType, INITIAL_EASE_FACTOR};
 
 impl Default for Card {

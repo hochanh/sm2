@@ -16,6 +16,30 @@ impl Scheduler {
             day_today: day_cut_off / 86_400,
         }
     }
+
+    fn fuzz_interval(interval: i32) -> i32 {
+        let (min, max) = Self::fuzz_interval_range(interval);
+        let mut rng = rand::thread_rng();
+        rng.gen_range(min..=max)
+    }
+
+    fn fuzz_interval_range(interval: i32) -> (i32, i32) {
+        match interval {
+            0..=1 => (1, 1),
+            2 => (2, 3),
+            _ => {
+                let fuzz = if interval < 7 {
+                    (interval as f32 * 0.25) as i32
+                } else if interval < 30 {
+                    max(2, (interval as f32 * 0.15) as i32)
+                } else {
+                    max(4, (interval as f32 * 0.05) as i32)
+                };
+                let fuzz_int = max(fuzz, 1);
+                (interval - fuzz_int, interval + fuzz_int)
+            }
+        }
+    }
 }
 
 impl Sched for Scheduler {
@@ -49,7 +73,7 @@ impl Scheduler {
         }
     }
 
-    fn start_remaining_steps(&mut self) -> i32 {
+    fn start_remaining_steps(&self) -> i32 {
         let steps = match self.card.card_type {
             CardType::Relearn => &self.config.relearn_steps,
             _ => &self.config.learn_steps,
@@ -121,7 +145,7 @@ impl Scheduler {
         self.card.card_type = CardType::Review;
     }
 
-    fn graduating_interval(&mut self, early: bool, fuzzy: bool) -> i32 {
+    fn graduating_interval(&self, early: bool, fuzzy: bool) -> i32 {
         match self.card.card_type {
             CardType::Review | CardType::Relearn => {
                 let bonus = if early { 1 } else { 0 };
@@ -135,34 +159,10 @@ impl Scheduler {
                 };
 
                 if fuzzy {
-                    Scheduler::fuzz_interval(ideal)
+                    Self::fuzz_interval(ideal)
                 } else {
                     ideal
                 }
-            }
-        }
-    }
-
-    fn fuzz_interval(interval: i32) -> i32 {
-        let (min, max) = Scheduler::fuzz_interval_range(interval);
-        let mut rng = rand::thread_rng();
-        rng.gen_range(min..=max)
-    }
-
-    fn fuzz_interval_range(interval: i32) -> (i32, i32) {
-        match interval {
-            0..=1 => (1, 1),
-            2 => (2, 3),
-            _ => {
-                let fuzz = if interval < 7 {
-                    (interval as f32 * 0.25) as i32
-                } else if interval < 30 {
-                    max(2, (interval as f32 * 0.15) as i32)
-                } else {
-                    max(4, (interval as f32 * 0.05) as i32)
-                };
-                let fuzz_int = max(fuzz, 1);
-                (interval - fuzz_int, interval + fuzz_int)
             }
         }
     }
@@ -223,7 +223,7 @@ impl Scheduler {
     fn constrain_interval(&self, interval: f32, previous: i32, fuzzy: bool) -> i32 {
         let mut interval = (interval * self.config.interval_multiplier) as i32;
         if fuzzy {
-            interval = Scheduler::fuzz_interval(interval);
+            interval = Self::fuzz_interval(interval);
         }
         interval = max(max(interval as i32, previous + 1), 1);
         min(interval, self.config.maximum_review_interval)
@@ -374,6 +374,50 @@ impl Scheduler {
         }
         self.reschedule_learn_card(steps, None)
     }
+
+    fn next_interval(&self, choice: Choice) -> i32 {
+        match self.card.card_queue {
+            CardQueue::New | CardQueue::Learn | CardQueue::DayLearn => {
+                self.next_learn_interval(choice)
+            }
+            _ => {
+                if matches!(choice, Choice::Again) {
+                    let steps = &self.config.relearn_steps;
+                    if !steps.is_empty() {
+                        (steps[0] * 60.0) as i32
+                    } else {
+                        self.lapse_interval() * 86_400
+                    }
+                } else {
+                    self.next_review_interval(choice, false) * 86_400
+                }
+            }
+        }
+    }
+
+    fn next_learn_interval(&self, choice: Choice) -> i32 {
+        let steps = &self.config.learn_steps;
+        match choice {
+            Choice::Again => self.delay_for_grade(steps, steps.len() as i32),
+            Choice::Hard => self.delay_for_repeating_grade(steps, steps.len() as i32),
+            Choice::Easy => self.graduating_interval(true, false) * 86_400,
+            Choice::Ok => {
+                let remaining = if matches!(self.card.card_queue, CardQueue::New) {
+                    self.start_remaining_steps()
+                } else {
+                    self.card.remaining_steps
+                };
+
+                let left = remaining % 1_000 - 1;
+
+                if left <= 0 {
+                    self.graduating_interval(false, false) * 86_400
+                } else {
+                    self.delay_for_grade(steps, left)
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -493,5 +537,37 @@ mod tests {
         scheduler.answer(Choice::Again);
         assert!(matches!(scheduler.card.card_type, CardType::Review));
         assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+    }
+
+    #[test]
+    fn test_learn_day() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.config.learn_steps = vec![1.0, 10.0, 1440.0, 2880.0];
+
+        // Pass it
+        scheduler.answer(Choice::Ok);
+        assert_eq!(scheduler.card.remaining_steps % 1_000, 3);
+        assert_eq!(scheduler.card.remaining_steps / 1_000, 1);
+        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400);
+
+        // Learn it
+        scheduler.answer(Choice::Ok);
+        assert_eq!(scheduler.card.due, scheduler.day_today + 1);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::DayLearn));
+
+        // Move back a day
+        scheduler.card.due -= 1;
+        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400 * 2);
+
+        // Fail to answer it
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+
+        // Ok to answer it
+        scheduler.answer(Choice::Ok);
+        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
     }
 }
