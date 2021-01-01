@@ -24,8 +24,7 @@ pub enum CardQueue {
 
     /// cards are not due in these states
     Suspended = -1,
-    SchedBuried = -2,
-    UserBuried = -3,
+    Buried = -2,
 }
 
 #[derive(Clone)]
@@ -88,6 +87,12 @@ pub enum Choice {
 trait Sched {
     fn answer_card(&mut self, choice: Choice);
     fn reset_card(&mut self);
+
+    fn bury_card(&mut self);
+    fn unbury_card(&mut self);
+
+    fn suspend_card(&mut self);
+    fn unsuspend_card(&mut self);
 }
 
 pub struct Scheduler {

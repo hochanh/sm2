@@ -51,6 +51,32 @@ impl Sched for Scheduler {
     fn reset_card(&mut self) {
         unimplemented!()
     }
+
+    fn bury_card(&mut self) {
+        self.card.card_queue = CardQueue::Buried;
+    }
+
+    fn unbury_card(&mut self) {
+        self.card.card_queue = CardQueue::New;
+    }
+
+    fn suspend_card(&mut self) {
+        self.card.card_queue = CardQueue::Suspended;
+    }
+
+    fn unsuspend_card(&mut self) {
+        self.card.card_queue = match self.card.card_type {
+            CardType::Learn | CardType::Relearn => {
+                if self.card.due > 1_000_000_000 {
+                    CardQueue::Learn
+                } else {
+                    CardQueue::DayLearn
+                }
+            }
+            CardType::New => CardQueue::New,
+            CardType::Review => CardQueue::Review,
+        }
+    }
 }
 
 impl Scheduler {
@@ -437,7 +463,6 @@ mod tests {
     use crate::srs::CardType;
 
     use super::*;
-    use crate::srs::CardQueue::SchedBuried;
 
     fn check_interval(card: &Card, interval: i32) -> bool {
         let (min, max) = Scheduler::fuzz_interval_range(interval);
@@ -660,5 +685,41 @@ mod tests {
         // Hard multiplier = 1, not increase day
         scheduler.config.hard_multiplier = 1.0;
         assert_eq!(scheduler.next_interval_string(Choice::Hard), "1d");
+    }
+
+    #[test]
+    fn test_bury() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.bury_card();
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Buried));
+
+        scheduler.unbury_card();
+        assert!(matches!(scheduler.card.card_queue, CardQueue::New));
+    }
+
+    #[test]
+    fn test_suspend() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.card.due = scheduler.day_today;
+        scheduler.card.interval = 100;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.card_type = CardType::Review;
+
+        scheduler.answer(Choice::Again);
+        assert!(scheduler.card.due > Timestamp::now());
+        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+
+        let due = scheduler.card.due;
+        scheduler.suspend_card();
+        scheduler.unsuspend_card();
+
+        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+        assert_eq!(scheduler.card.due, due);
     }
 }
