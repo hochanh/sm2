@@ -1,4 +1,4 @@
-use crate::srs::{Config, LeechAction, NewCardOrder};
+use crate::srs::{Config, NewCardOrder};
 
 impl Default for Config {
     fn default() -> Self {
@@ -21,7 +21,6 @@ impl Default for Config {
             graduating_interval_good: 1,
             graduating_interval_easy: 4,
             new_card_order: NewCardOrder::Due,
-            leech_action: LeechAction::Suspend,
             leech_threshold: 8,
         }
     }

@@ -4,7 +4,7 @@ pub mod scheduler;
 
 pub const INITIAL_EASE_FACTOR: i32 = 2_500; // 250%
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum CardType {
     New = 0,
     Learn = 1,
@@ -12,7 +12,7 @@ pub enum CardType {
     Relearn = 3,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum CardQueue {
     New = 0,
     // due is the order cards are shown in
@@ -28,6 +28,7 @@ pub enum CardQueue {
     UserBuried = -3,
 }
 
+#[derive(Clone)]
 pub struct Card {
     pub(crate) card_type: CardType,
     pub(crate) card_queue: CardQueue,
@@ -39,16 +40,13 @@ pub struct Card {
     pub(crate) remaining_steps: i32,
 }
 
+#[derive(Clone)]
 pub enum NewCardOrder {
     Due = 0,
     Random = 1,
 }
 
-pub enum LeechAction {
-    Suspend = 0,
-    Tag = 1,
-}
-
+#[derive(Clone)]
 pub struct Config {
     pub learn_steps: Vec<f32>,
     pub relearn_steps: Vec<f32>,
@@ -76,7 +74,6 @@ pub struct Config {
     pub graduating_interval_easy: i32,
 
     pub new_card_order: NewCardOrder,
-    pub leech_action: LeechAction,
     pub leech_threshold: i32,
 }
 

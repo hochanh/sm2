@@ -234,7 +234,7 @@ impl Scheduler {
     }
 
     fn next_review_interval(&self, choice: Choice, fuzzy: bool) -> i32 {
-        let factor = self.card.ease_factor / 1_000;
+        let factor = self.card.ease_factor as f32 / 1_000.0;
         let delay = self.days_late();
         let hard_factor = self.config.hard_multiplier;
         let hard_min = if hard_factor > 1.0 {
@@ -249,7 +249,7 @@ impl Scheduler {
         }
 
         interval = self.constrain_interval(
-            (self.card.interval as f32 + delay as f32 / 2.0) * factor as f32,
+            (self.card.interval as f32 + delay as f32 / 2.0) * factor,
             interval,
             fuzzy,
         );
@@ -258,7 +258,7 @@ impl Scheduler {
         }
 
         self.constrain_interval(
-            ((self.card.interval + delay) * factor) as f32 * self.config.easy_multiplier,
+            ((self.card.interval + delay) as f32 * factor) * self.config.easy_multiplier,
             interval,
             fuzzy,
         )
@@ -268,7 +268,11 @@ impl Scheduler {
         self.card.lapses += 1;
         self.card.ease_factor = max(1_300, self.card.ease_factor - 200);
 
-        let suspended = self.check_leech() && matches!(self.card.card_queue, CardQueue::Suspended);
+        let leech = self.check_leech();
+        if leech {
+            self.card.card_queue = CardQueue::Suspended
+        }
+        let suspended = matches!(self.card.card_queue, CardQueue::Suspended);
 
         let steps = &self.config.relearn_steps.clone();
         if !steps.is_empty() && !suspended {
@@ -426,6 +430,12 @@ mod tests {
     use crate::srs::CardType;
 
     use super::*;
+    use crate::srs::CardQueue::SchedBuried;
+
+    fn check_interval(card: &Card, interval: i32) -> bool {
+        let (min, max) = Scheduler::fuzz_interval_range(interval);
+        card.interval >= min && card.interval <= max
+    }
 
     #[test]
     fn test_new() {
@@ -493,8 +503,7 @@ mod tests {
         scheduler.answer(Choice::Easy);
         assert!(matches!(scheduler.card.card_type, CardType::Review));
         assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        let (min, max) = Scheduler::fuzz_interval_range(4);
-        assert!(scheduler.card.interval >= min && scheduler.card.interval <= max);
+        assert!(check_interval(&scheduler.card, 4));
     }
 
     #[test]
@@ -569,5 +578,61 @@ mod tests {
         scheduler.answer(Choice::Ok);
         assert_eq!(scheduler.next_interval(Choice::Ok), 86_400);
         assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+    }
+
+    #[test]
+    fn test_review() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.card.card_type = CardType::Review;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.due = scheduler.day_today - 8;
+        scheduler.card.ease_factor = INITIAL_EASE_FACTOR;
+        scheduler.card.reps = 3;
+        scheduler.card.lapses = 1;
+        scheduler.card.interval = 100;
+
+        let card_copy = scheduler.card.clone();
+
+        // Hard
+        scheduler.answer(Choice::Hard);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert!(check_interval(&scheduler.card, 120));
+        assert_eq!(
+            scheduler.card.due,
+            scheduler.day_today + scheduler.card.interval as i64
+        );
+        assert_eq!(scheduler.card.ease_factor, 2_350);
+        assert_eq!(scheduler.card.lapses, 1);
+        assert_eq!(scheduler.card.reps, 4);
+
+        // Ok
+        scheduler.card = card_copy.clone();
+        scheduler.answer(Choice::Ok);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert!(check_interval(&scheduler.card, 260));
+        assert_eq!(
+            scheduler.card.due,
+            scheduler.day_today + scheduler.card.interval as i64
+        );
+        assert_eq!(scheduler.card.ease_factor, INITIAL_EASE_FACTOR);
+
+        // Easy
+        scheduler.card = card_copy.clone();
+        scheduler.answer(Choice::Easy);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert!(check_interval(&scheduler.card, 351));
+        assert_eq!(
+            scheduler.card.due,
+            scheduler.day_today + scheduler.card.interval as i64
+        );
+        assert_eq!(scheduler.card.ease_factor, 2_650);
+
+        // Leech
+        scheduler.card = card_copy.clone();
+        scheduler.card.lapses = 7;
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Suspended));
     }
 }
