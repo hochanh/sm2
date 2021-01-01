@@ -1,4 +1,39 @@
-use crate::srs::{Card, CardQueue, CardType, INITIAL_EASE_FACTOR};
+use crate::srs::config::INITIAL_EASE_FACTOR;
+
+#[derive(PartialEq, Clone)]
+pub enum CardType {
+    New = 0,
+    Learn = 1,
+    Review = 2,
+    Relearn = 3,
+}
+
+#[derive(PartialEq, Clone)]
+pub enum CardQueue {
+    New = 0,
+    // due is the order cards are shown in
+    Learn = 1,
+    // due is a unix timestamp
+    Review = 2,
+    // due is days since epoch
+    DayLearn = 3, // due is days since epoch
+
+    /// cards are not due in these states
+    Suspended = -1,
+    Buried = -2,
+}
+
+#[derive(Clone)]
+pub struct Card {
+    pub(crate) card_type: CardType,
+    pub(crate) card_queue: CardQueue,
+    pub(crate) due: i64,
+    pub(crate) interval: i32,
+    pub(crate) ease_factor: i32,
+    pub(crate) reps: i32,
+    pub(crate) lapses: i32,
+    pub(crate) remaining_steps: i32,
+}
 
 impl Default for Card {
     fn default() -> Self {

@@ -5,9 +5,36 @@ use rand::Rng;
 
 use crate::service::timespan::answer_button_time;
 use crate::service::timestamp::Timestamp;
-use crate::srs::{
-    Card, CardQueue, CardType, Choice, Config, Sched, Scheduler, INITIAL_EASE_FACTOR,
-};
+use crate::srs::card::{Card, CardQueue, CardType};
+use crate::srs::config::{Config, INITIAL_EASE_FACTOR};
+
+#[derive(Clone, Copy)]
+pub enum Choice {
+    Again = 1,
+    Hard = 2,
+    Ok = 3,
+    Easy = 4,
+}
+
+trait Sched {
+    fn answer_card(&mut self, choice: Choice);
+
+    fn bury_card(&mut self);
+    fn unbury_card(&mut self);
+
+    fn suspend_card(&mut self);
+    fn unsuspend_card(&mut self);
+
+    fn schedule_card_as_new(&mut self);
+    fn schedule_card_as_review(&mut self, min_days: i32, max_days: i32);
+}
+
+pub struct Scheduler {
+    card: Card,
+    config: Config,
+    day_cut_off: i64,
+    day_today: i64,
+}
 
 impl Scheduler {
     pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
@@ -468,7 +495,7 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use crate::service::timestamp::Timestamp;
-    use crate::srs::CardType;
+    use crate::srs::card::CardType;
 
     use super::*;
 
