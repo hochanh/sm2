@@ -1,1 +1,2 @@
-pub mod time;
+pub mod timespan;
+pub mod timestamp;

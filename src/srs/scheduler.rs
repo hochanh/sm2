@@ -2,7 +2,8 @@ use std::cmp::{max, min};
 
 use rand::Rng;
 
-use crate::service::time::Timestamp;
+use crate::service::timespan::answer_button_time;
+use crate::service::timestamp::Timestamp;
 use crate::srs::{
     Card, CardQueue, CardType, Choice, Config, Sched, Scheduler, INITIAL_EASE_FACTOR,
 };
@@ -269,6 +270,7 @@ impl Scheduler {
         self.card.ease_factor = max(1_300, self.card.ease_factor - 200);
 
         let leech = self.check_leech();
+        // Always suspend card on leech
         if leech {
             self.card.card_queue = CardQueue::Suspended
         }
@@ -422,11 +424,16 @@ impl Scheduler {
             }
         }
     }
+
+    fn next_interval_string(&self, choice: Choice) -> String {
+        let interval_secs = self.next_interval(choice);
+        answer_button_time(interval_secs as f32)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::service::time::Timestamp;
+    use crate::service::timestamp::Timestamp;
     use crate::srs::CardType;
 
     use super::*;
@@ -634,5 +641,24 @@ mod tests {
         scheduler.card.lapses = 7;
         scheduler.answer(Choice::Again);
         assert!(matches!(scheduler.card.card_queue, CardQueue::Suspended));
+    }
+
+    #[test]
+    fn test_spacing_button() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        scheduler.card.card_type = CardType::Review;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.due = scheduler.day_today;
+        scheduler.card.reps = 1;
+        scheduler.card.interval = 1;
+
+        assert_eq!(scheduler.next_interval_string(Choice::Hard), "2d");
+        assert_eq!(scheduler.next_interval_string(Choice::Ok), "3d");
+        assert_eq!(scheduler.next_interval_string(Choice::Easy), "4d");
+
+        // Hard multiplier = 1, not increase day
+        scheduler.config.hard_multiplier = 1.0;
+        assert_eq!(scheduler.next_interval_string(Choice::Hard), "1d");
     }
 }
