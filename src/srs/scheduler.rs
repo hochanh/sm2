@@ -547,6 +547,18 @@ mod tests {
     }
 
     #[test]
+    fn test_initial_hard() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        scheduler.answer(Choice::Hard);
+        let expected = Timestamp::now() + 330;
+        assert!(
+            scheduler.card.due >= expected - 10
+                && scheduler.card.due <= (expected as f32 * 1.25) as i64
+        );
+    }
+
+    #[test]
     fn test_relearn() {
         let mut scheduler =
             Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
@@ -750,5 +762,25 @@ mod tests {
         assert_eq!(scheduler.card.due, 0);
         assert!(matches!(scheduler.card.card_queue, CardQueue::New));
         assert!(matches!(scheduler.card.card_type, CardType::New));
+    }
+
+    #[test]
+    fn test_fail_multiple() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.card.interval = 100;
+        scheduler.card.due = scheduler.day_today - 100;
+        scheduler.card.card_queue = CardQueue::Review;
+        scheduler.card.card_type = CardType::Review;
+        scheduler.card.ease_factor = INITIAL_EASE_FACTOR;
+        scheduler.card.reps = 3;
+        scheduler.card.lapses = 3;
+
+        scheduler.config.lapse_multiplier = 0.5;
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.interval, 50));
+        scheduler.answer(Choice::Again);
+        assert!(matches!(scheduler.card.interval, 25));
     }
 }

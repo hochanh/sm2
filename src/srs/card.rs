@@ -49,3 +49,20 @@ impl Card {
         self.due = position;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_new_position() {
+        let mut card = Card::default();
+        card.set_new_position(1);
+        assert_eq!(card.due, 1);
+
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
+        card.set_new_position(2);
+        assert_eq!(card.due, 1);
+    }
+}
