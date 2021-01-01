@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 
+use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 
 use crate::service::timespan::answer_button_time;
@@ -48,10 +49,6 @@ impl Sched for Scheduler {
         self.answer(choice);
     }
 
-    fn reset_card(&mut self) {
-        unimplemented!()
-    }
-
     fn bury_card(&mut self) {
         self.card.card_queue = CardQueue::Buried;
     }
@@ -76,6 +73,17 @@ impl Sched for Scheduler {
             CardType::New => CardQueue::New,
             CardType::Review => CardQueue::Review,
         }
+    }
+
+    fn schedule_card_as_new(&mut self) {
+        self.card.schedule_as_new(0);
+    }
+
+    fn schedule_card_as_review(&mut self, min_days: i32, max_days: i32) {
+        let mut rng = rand::thread_rng();
+        let distribution = Uniform::from(min_days..=max_days);
+        let interval = distribution.sample(&mut rng);
+        self.card.schedule_as_review(interval, self.day_today);
     }
 }
 
@@ -721,5 +729,26 @@ mod tests {
         assert!(matches!(scheduler.card.card_type, CardType::Relearn));
         assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
         assert_eq!(scheduler.card.due, due);
+    }
+
+    #[test]
+    fn test_reschedule() {
+        let mut scheduler =
+            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+
+        scheduler.schedule_card_as_review(0, 0);
+        assert_eq!(scheduler.card.due, scheduler.day_today);
+        assert_eq!(scheduler.card.interval, 1);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert!(matches!(scheduler.card.card_type, CardType::Review));
+
+        scheduler.schedule_card_as_review(1, 1);
+        assert_eq!(scheduler.card.due, scheduler.day_today + 1);
+        assert_eq!(scheduler.card.interval, 1);
+
+        scheduler.schedule_card_as_new();
+        assert_eq!(scheduler.card.due, 0);
+        assert!(matches!(scheduler.card.card_queue, CardQueue::New));
+        assert!(matches!(scheduler.card.card_type, CardType::New));
     }
 }

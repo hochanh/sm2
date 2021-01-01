@@ -86,13 +86,15 @@ pub enum Choice {
 
 trait Sched {
     fn answer_card(&mut self, choice: Choice);
-    fn reset_card(&mut self);
 
     fn bury_card(&mut self);
     fn unbury_card(&mut self);
 
     fn suspend_card(&mut self);
     fn unsuspend_card(&mut self);
+
+    fn schedule_card_as_new(&mut self);
+    fn schedule_card_as_review(&mut self, min_days: i32, max_days: i32);
 }
 
 pub struct Scheduler {
