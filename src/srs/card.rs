@@ -10,13 +10,15 @@ pub enum CardType {
 
 #[derive(PartialEq, Clone)]
 pub enum CardQueue {
-    New = 0,
     // due is the order cards are shown in
+    New = 0,
+
+    // due is number of seconds since epoch
     Learn = 1,
-    // due is a unix timestamp
+
+    // due is number of days since epoch
     Review = 2,
-    // due is days since epoch
-    DayLearn = 3, // due is days since epoch
+    DayLearn = 3,
 
     /// cards are not due in these states
     Suspended = -1,
