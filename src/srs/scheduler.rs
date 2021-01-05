@@ -81,7 +81,7 @@ impl Sched for Scheduler {
     }
 
     fn unbury_card(&mut self) {
-        self.card.card_queue = CardQueue::New;
+        self.schedule_card_as_new();
     }
 
     fn suspend_card(&mut self) {
