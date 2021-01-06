@@ -13,4 +13,4 @@ rand = "0.8"
 [dev-dependencies.cargo-husky]
 version = "1"
 default-features = false
-features = ["precommit-hook", "run-cargo-test", "run-cargo-fmt"]
+features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy", "run-cargo-check", "run-cargo-fmt"]
