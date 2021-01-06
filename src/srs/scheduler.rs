@@ -17,32 +17,30 @@ pub enum Choice {
 }
 
 trait Sched {
-    fn answer_card(&mut self, choice: Choice);
+    fn next_interval(&self, card: &Card, choice: Choice) -> i32;
+    fn next_interval_string(&self, card: &Card, choice: Choice) -> String;
 
-    fn next_interval(&self, choice: Choice) -> i32;
-    fn next_interval_string(&self, choice: Choice) -> String;
+    fn answer_card(&self, card: &mut Card, choice: Choice);
 
-    fn bury_card(&mut self);
-    fn unbury_card(&mut self);
+    fn bury_card(&self, card: &mut Card);
+    fn unbury_card(&self, card: &mut Card);
 
-    fn suspend_card(&mut self);
-    fn unsuspend_card(&mut self);
+    fn suspend_card(&self, card: &mut Card);
+    fn unsuspend_card(&self, card: &mut Card);
 
-    fn schedule_card_as_new(&mut self);
-    fn schedule_card_as_review(&mut self, min_days: i32, max_days: i32);
+    fn schedule_card_as_new(&self, card: &mut Card);
+    fn schedule_card_as_review(&self, card: &mut Card, min_days: i32, max_days: i32);
 }
 
 pub struct Scheduler {
-    card: Card,
     config: Config,
     day_cut_off: i64,
     day_today: i64,
 }
 
 impl Scheduler {
-    pub fn new(card: Card, config: Config, day_cut_off: i64) -> Self {
+    pub fn new(config: Config, day_cut_off: i64) -> Self {
         Self {
-            card,
             config,
             day_cut_off,
             day_today: day_cut_off / 86_400,
@@ -75,14 +73,10 @@ impl Scheduler {
 }
 
 impl Sched for Scheduler {
-    fn answer_card(&mut self, choice: Choice) {
-        self.answer(choice);
-    }
-
-    fn next_interval(&self, choice: Choice) -> i32 {
-        match self.card.card_queue {
+    fn next_interval(&self, card: &Card, choice: Choice) -> i32 {
+        match card.card_queue {
             CardQueue::New | CardQueue::Learn | CardQueue::DayLearn => {
-                self.next_learn_interval(choice)
+                self.next_learn_interval(card, choice)
             }
             _ => {
                 if matches!(choice, Choice::Again) {
@@ -90,36 +84,40 @@ impl Sched for Scheduler {
                     if !steps.is_empty() {
                         (steps[0] * 60.0) as i32
                     } else {
-                        self.lapse_interval() * 86_400
+                        self.lapse_interval(card) * 86_400
                     }
                 } else {
-                    self.next_review_interval(choice, false) * 86_400
+                    self.next_review_interval(card, choice, false) * 86_400
                 }
             }
         }
     }
 
-    fn next_interval_string(&self, choice: Choice) -> String {
-        let interval_secs = self.next_interval(choice);
+    fn next_interval_string(&self, card: &Card, choice: Choice) -> String {
+        let interval_secs = self.next_interval(card, choice);
         answer_button_time(interval_secs as f32)
     }
 
-    fn bury_card(&mut self) {
-        self.card.card_queue = CardQueue::Buried;
+    fn answer_card(&self, card: &mut Card, choice: Choice) {
+        self.answer(card, choice);
     }
 
-    fn unbury_card(&mut self) {
-        self.schedule_card_as_new();
+    fn bury_card(&self, card: &mut Card) {
+        card.card_queue = CardQueue::Buried;
     }
 
-    fn suspend_card(&mut self) {
-        self.card.card_queue = CardQueue::Suspended;
+    fn unbury_card(&self, card: &mut Card) {
+        self.schedule_card_as_new(card);
     }
 
-    fn unsuspend_card(&mut self) {
-        self.card.card_queue = match self.card.card_type {
+    fn suspend_card(&self, card: &mut Card) {
+        card.card_queue = CardQueue::Suspended;
+    }
+
+    fn unsuspend_card(&self, card: &mut Card) {
+        card.card_queue = match card.card_type {
             CardType::Learn | CardType::Relearn => {
-                if self.card.due > 1_000_000_000 {
+                if card.due > 1_000_000_000 {
                     CardQueue::Learn
                 } else {
                     CardQueue::DayLearn
@@ -130,41 +128,41 @@ impl Sched for Scheduler {
         }
     }
 
-    fn schedule_card_as_new(&mut self) {
-        self.card.schedule_as_new(0);
+    fn schedule_card_as_new(&self, card: &mut Card) {
+        card.schedule_as_new(0);
     }
 
-    fn schedule_card_as_review(&mut self, min_days: i32, max_days: i32) {
+    fn schedule_card_as_review(&self, card: &mut Card, min_days: i32, max_days: i32) {
         let mut rng = rand::thread_rng();
         let distribution = Uniform::from(min_days..=max_days);
         let interval = distribution.sample(&mut rng);
-        self.card.schedule_as_review(interval, self.day_today);
+        card.schedule_as_review(interval, self.day_today);
     }
 }
 
 impl Scheduler {
-    fn answer(&mut self, choice: Choice) {
-        self.card.reps += 1;
+    fn answer(&self, card: &mut Card, choice: Choice) {
+        card.reps += 1;
 
-        if matches!(self.card.card_queue, CardQueue::New) {
-            self.card.card_queue = CardQueue::Learn;
-            self.card.card_type = CardType::Learn;
-            self.card.remaining_steps = self.start_remaining_steps();
+        if matches!(card.card_queue, CardQueue::New) {
+            card.card_queue = CardQueue::Learn;
+            card.card_type = CardType::Learn;
+            card.remaining_steps = self.start_remaining_steps(card);
         }
 
-        match self.card.card_queue {
+        match card.card_queue {
             CardQueue::Learn | CardQueue::DayLearn => {
-                self.answer_learn_card(choice);
+                self.answer_learn_card(card, choice);
             }
             CardQueue::Review => {
-                self.answer_review_card(choice);
+                self.answer_review_card(card, choice);
             }
             _ => {}
         }
     }
 
-    fn start_remaining_steps(&self) -> i32 {
-        let steps = match self.card.card_type {
+    fn start_remaining_steps(&self, card: &Card) -> i32 {
+        let steps = match card.card_type {
             CardType::Relearn => &self.config.relearn_steps,
             _ => &self.config.learn_steps,
         };
@@ -195,51 +193,51 @@ impl Scheduler {
         (remain + 1) as i32
     }
 
-    fn answer_learn_card(&mut self, choice: Choice) {
+    fn answer_learn_card(&self, card: &mut Card, choice: Choice) {
         let steps = &self.config.learn_steps.clone();
         match choice {
-            Choice::Easy => self.reschedule_as_review(true),
+            Choice::Easy => self.reschedule_as_review(card, true),
             Choice::Ok => {
-                if self.card.remaining_steps % 1_000 <= 1 {
-                    self.reschedule_as_review(false)
+                if card.remaining_steps % 1_000 <= 1 {
+                    self.reschedule_as_review(card, false)
                 } else {
-                    self.move_to_next_step(steps)
+                    self.move_to_next_step(card, steps)
                 }
             }
-            Choice::Hard => self.repeat_step(steps),
-            Choice::Again => self.move_to_first_step(steps),
+            Choice::Hard => self.repeat_step(card, steps),
+            Choice::Again => self.move_to_first_step(card, steps),
         }
     }
 
-    fn reschedule_as_review(&mut self, early: bool) {
-        match self.card.card_type {
-            CardType::Review | CardType::Relearn => self.reschedule_graduating_lapse(early),
-            _ => self.reschedule_new(early),
+    fn reschedule_as_review(&self, card: &mut Card, early: bool) {
+        match card.card_type {
+            CardType::Review | CardType::Relearn => self.reschedule_graduating_lapse(card, early),
+            _ => self.reschedule_new(card, early),
         }
     }
 
-    fn reschedule_graduating_lapse(&mut self, early: bool) {
+    fn reschedule_graduating_lapse(&self, card: &mut Card, early: bool) {
         if early {
-            self.card.interval += 1
+            card.interval += 1
         }
-        self.card.due = self.day_today + self.card.interval as i64;
-        self.card.card_type = CardType::Review;
-        self.card.card_queue = CardQueue::Review;
+        card.due = self.day_today + card.interval as i64;
+        card.card_type = CardType::Review;
+        card.card_queue = CardQueue::Review;
     }
 
-    fn reschedule_new(&mut self, early: bool) {
-        self.card.interval = self.graduating_interval(early, true);
-        self.card.due = self.day_today + self.card.interval as i64;
-        self.card.ease_factor = INITIAL_EASE_FACTOR;
-        self.card.card_queue = CardQueue::Review;
-        self.card.card_type = CardType::Review;
+    fn reschedule_new(&self, card: &mut Card, early: bool) {
+        card.interval = self.graduating_interval(card, early, true);
+        card.due = self.day_today + card.interval as i64;
+        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
     }
 
-    fn graduating_interval(&self, early: bool, fuzzy: bool) -> i32 {
-        match self.card.card_type {
+    fn graduating_interval(&self, card: &Card, early: bool, fuzzy: bool) -> i32 {
+        match card.card_type {
             CardType::Review | CardType::Relearn => {
                 let bonus = if early { 1 } else { 0 };
-                self.card.interval + bonus
+                card.interval + bonus
             }
             _ => {
                 let ideal = if early {
@@ -257,34 +255,34 @@ impl Scheduler {
         }
     }
 
-    fn answer_review_card(&mut self, choice: Choice) {
+    fn answer_review_card(&self, card: &mut Card, choice: Choice) {
         let early = false;
         match choice {
-            Choice::Again => self.reschedule_lapse(),
-            _ => self.reschedule_review(choice, early),
+            Choice::Again => self.reschedule_lapse(card),
+            _ => self.reschedule_review(card, choice, early),
         }
     }
 
-    fn reschedule_review(&mut self, choice: Choice, early: bool) {
+    fn reschedule_review(&self, card: &mut Card, choice: Choice, early: bool) {
         if early {
-            self.update_early_review_interval(choice)
+            self.update_early_review_interval(card, choice)
         } else {
-            self.update_review_interval(choice)
+            self.update_review_interval(card, choice)
         }
 
-        self.card.ease_factor = max(
+        card.ease_factor = max(
             1_300,
-            self.card.ease_factor + vec![-150, 0, 150][choice as usize - 2],
+            card.ease_factor + vec![-150, 0, 150][choice as usize - 2],
         );
-        self.card.due = self.day_today + self.card.interval as i64;
+        card.due = self.day_today + card.interval as i64;
     }
 
-    fn update_early_review_interval(&mut self, choice: Choice) {
-        self.card.interval = self.early_review_interval(choice)
+    fn update_early_review_interval(&self, card: &mut Card, choice: Choice) {
+        card.interval = self.early_review_interval(card, choice)
     }
 
-    fn early_review_interval(&self, choice: Choice) -> i32 {
-        let elapsed = self.day_today + self.card.interval as i64;
+    fn early_review_interval(&self, card: &mut Card, choice: Choice) -> i32 {
+        let elapsed = self.day_today + card.interval as i64;
 
         let mut easy_bonus = 1.0;
         let mut min_new_interval = 1;
@@ -296,17 +294,17 @@ impl Scheduler {
                 min_new_interval = (factor / 2.0) as i32;
             }
             Choice::Ok => {
-                factor = self.card.ease_factor as f32 / 1_000.0;
+                factor = card.ease_factor as f32 / 1_000.0;
             }
             _ => {
-                factor = self.card.ease_factor as f32 / 1_000.0;
+                factor = card.ease_factor as f32 / 1_000.0;
                 let bonus = self.config.easy_multiplier;
                 easy_bonus = bonus - (bonus - 1.0) / 2.0
             }
         }
 
         let mut interval = f32::max(elapsed as f32 * factor, 1.0);
-        interval = f32::max((self.card.interval * min_new_interval) as f32, interval) * easy_bonus;
+        interval = f32::max((card.interval * min_new_interval) as f32, interval) * easy_bonus;
         self.constrain_interval(interval, 0, false)
     }
 
@@ -319,27 +317,23 @@ impl Scheduler {
         min(interval, self.config.maximum_review_interval)
     }
 
-    fn update_review_interval(&mut self, choice: Choice) {
-        self.card.interval = self.next_review_interval(choice, true)
+    fn update_review_interval(&self, card: &mut Card, choice: Choice) {
+        card.interval = self.next_review_interval(card, choice, true)
     }
 
-    fn next_review_interval(&self, choice: Choice, fuzzy: bool) -> i32 {
-        let factor = self.card.ease_factor as f32 / 1_000.0;
-        let delay = self.days_late();
+    fn next_review_interval(&self, card: &Card, choice: Choice, fuzzy: bool) -> i32 {
+        let factor = card.ease_factor as f32 / 1_000.0;
+        let delay = self.days_late(card);
         let hard_factor = self.config.hard_multiplier;
-        let hard_min = if hard_factor > 1.0 {
-            self.card.interval
-        } else {
-            0
-        } as i32;
+        let hard_min = if hard_factor > 1.0 { card.interval } else { 0 } as i32;
         let mut interval =
-            self.constrain_interval(self.card.interval as f32 * hard_factor, hard_min, fuzzy);
+            self.constrain_interval(card.interval as f32 * hard_factor, hard_min, fuzzy);
         if matches!(choice, Choice::Hard) {
             return interval;
         }
 
         interval = self.constrain_interval(
-            (self.card.interval as f32 + delay as f32 / 2.0) * factor,
+            (card.interval as f32 + delay as f32 / 2.0) * factor,
             interval,
             fuzzy,
         );
@@ -348,95 +342,94 @@ impl Scheduler {
         }
 
         self.constrain_interval(
-            ((self.card.interval + delay) as f32 * factor) * self.config.easy_multiplier,
+            ((card.interval + delay) as f32 * factor) * self.config.easy_multiplier,
             interval,
             fuzzy,
         )
     }
 
-    fn reschedule_lapse(&mut self) {
-        self.card.lapses += 1;
-        self.card.ease_factor = max(1_300, self.card.ease_factor - 200);
+    fn reschedule_lapse(&self, card: &mut Card) {
+        card.lapses += 1;
+        card.ease_factor = max(1_300, card.ease_factor - 200);
 
-        let leech = self.check_leech();
+        let leech = self.check_leech(card);
         // Always suspend card on leech
         if leech {
-            self.card.card_queue = CardQueue::Suspended
+            card.card_queue = CardQueue::Suspended
         }
-        let suspended = matches!(self.card.card_queue, CardQueue::Suspended);
+        let suspended = matches!(card.card_queue, CardQueue::Suspended);
 
         let steps = &self.config.relearn_steps.clone();
         if !steps.is_empty() && !suspended {
-            self.card.card_type = CardType::Relearn;
-            self.move_to_first_step(steps);
+            card.card_type = CardType::Relearn;
+            self.move_to_first_step(card, steps);
         } else {
-            self.update_review_interval_on_fail();
-            self.reschedule_as_review(false);
+            self.update_review_interval_on_fail(card);
+            self.reschedule_as_review(card, false);
 
             if suspended {
-                self.card.card_queue = CardQueue::Suspended;
+                card.card_queue = CardQueue::Suspended;
             }
         }
     }
 
-    fn update_review_interval_on_fail(&mut self) {
-        self.card.interval = self.lapse_interval();
+    fn update_review_interval_on_fail(&self, card: &mut Card) {
+        card.interval = self.lapse_interval(card);
     }
 
-    fn lapse_interval(&self) -> i32 {
+    fn lapse_interval(&self, card: &Card) -> i32 {
         max(
             1,
             max(
                 self.config.minimum_review_interval,
-                (self.card.interval as f32 * self.config.lapse_multiplier) as i32,
+                (card.interval as f32 * self.config.lapse_multiplier) as i32,
             ),
         )
     }
 
-    fn check_leech(&self) -> bool {
+    fn check_leech(&self, card: &mut Card) -> bool {
         let lt = self.config.leech_threshold;
         if lt == 0 {
             false
         } else {
-            self.card.lapses >= lt && (self.card.lapses - lt) % (max(lt / 2, 1)) == 0
+            card.lapses >= lt && (card.lapses - lt) % (max(lt / 2, 1)) == 0
         }
     }
 
-    fn days_late(&self) -> i32 {
-        max(0, self.day_today - self.card.due) as i32
+    fn days_late(&self, card: &Card) -> i32 {
+        max(0, self.day_today - card.due) as i32
     }
 
-    fn move_to_next_step(&mut self, steps: &[f32]) {
-        let remaining = (self.card.remaining_steps % 1_000) - 1;
-        self.card.remaining_steps =
-            self.remaining_today(steps, remaining as usize) * 1_000 + remaining;
+    fn move_to_next_step(&self, card: &mut Card, steps: &[f32]) {
+        let remaining = (card.remaining_steps % 1_000) - 1;
+        card.remaining_steps = self.remaining_today(steps, remaining as usize) * 1_000 + remaining;
 
-        self.reschedule_learn_card(steps, None);
+        self.reschedule_learn_card(card, steps, None);
     }
 
-    fn repeat_step(&mut self, steps: &[f32]) {
-        let delay = self.delay_for_repeating_grade(steps, self.card.remaining_steps);
-        self.reschedule_learn_card(steps, Some(delay))
+    fn repeat_step(&self, card: &mut Card, steps: &[f32]) {
+        let delay = self.delay_for_repeating_grade(steps, card.remaining_steps);
+        self.reschedule_learn_card(card, steps, Some(delay))
     }
 
-    fn reschedule_learn_card(&mut self, steps: &[f32], delay: Option<i32>) {
+    fn reschedule_learn_card(&self, card: &mut Card, steps: &[f32], delay: Option<i32>) {
         let delay = match delay {
-            None => self.delay_for_grade(steps, self.card.remaining_steps),
+            None => self.delay_for_grade(steps, card.remaining_steps),
             Some(value) => value,
         };
 
-        self.card.due = Timestamp::now() + delay as i64;
+        card.due = Timestamp::now() + delay as i64;
 
-        if self.card.due < self.day_cut_off {
+        if card.due < self.day_cut_off {
             let max_extra = min(300, (delay as f32 * 0.25) as i64);
             let mut rng = rand::thread_rng();
             let fuzz = rng.gen_range(0..=max(1, max_extra));
-            self.card.due = min(self.day_cut_off - 1, self.card.due + fuzz);
-            self.card.card_queue = CardQueue::Learn;
+            card.due = min(self.day_cut_off - 1, card.due + fuzz);
+            card.card_queue = CardQueue::Learn;
         } else {
-            let ahead = ((self.card.due - self.day_cut_off) / 86_400) + 1;
-            self.card.due = self.day_today + ahead;
-            self.card.card_queue = CardQueue::DayLearn;
+            let ahead = ((card.due - self.day_cut_off) / 86_400) + 1;
+            card.due = self.day_today + ahead;
+            card.card_queue = CardQueue::DayLearn;
         }
     }
 
@@ -462,31 +455,31 @@ impl Scheduler {
         (delay * 60.0) as i32
     }
 
-    fn move_to_first_step(&mut self, steps: &[f32]) {
-        self.card.remaining_steps = self.start_remaining_steps();
-        if matches!(self.card.card_type, CardType::Relearn) {
-            self.update_review_interval_on_fail()
+    fn move_to_first_step(&self, card: &mut Card, steps: &[f32]) {
+        card.remaining_steps = self.start_remaining_steps(card);
+        if matches!(card.card_type, CardType::Relearn) {
+            self.update_review_interval_on_fail(card)
         }
-        self.reschedule_learn_card(steps, None)
+        self.reschedule_learn_card(card, steps, None)
     }
 
-    fn next_learn_interval(&self, choice: Choice) -> i32 {
+    fn next_learn_interval(&self, card: &Card, choice: Choice) -> i32 {
         let steps = &self.config.learn_steps;
         match choice {
             Choice::Again => self.delay_for_grade(steps, steps.len() as i32),
             Choice::Hard => self.delay_for_repeating_grade(steps, steps.len() as i32),
-            Choice::Easy => self.graduating_interval(true, false) * 86_400,
+            Choice::Easy => self.graduating_interval(card, true, false) * 86_400,
             Choice::Ok => {
-                let remaining = if matches!(self.card.card_queue, CardQueue::New) {
-                    self.start_remaining_steps()
+                let remaining = if matches!(card.card_queue, CardQueue::New) {
+                    self.start_remaining_steps(card)
                 } else {
-                    self.card.remaining_steps
+                    card.remaining_steps
                 };
 
                 let left = remaining % 1_000 - 1;
 
                 if left <= 0 {
-                    self.graduating_interval(false, false) * 86_400
+                    self.graduating_interval(card, false, false) * 86_400
                 } else {
                     self.delay_for_grade(steps, left)
                 }
@@ -509,308 +502,306 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
-        scheduler.answer_card(Choice::Again);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
-        assert!(matches!(scheduler.card.card_type, CardType::Learn));
-        assert!(scheduler.card.due >= Timestamp::now());
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
+        scheduler.answer_card(&mut card, Choice::Again);
+        assert!(matches!(card.card_queue, CardQueue::Learn));
+        assert!(matches!(card.card_type, CardType::Learn));
+        assert!(card.due >= Timestamp::now());
     }
 
     #[test]
     fn test_change_steps() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
         scheduler.config.learn_steps = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        scheduler.answer(Choice::Ok);
+        scheduler.answer_card(&mut card, Choice::Ok);
         scheduler.config.learn_steps = vec![1.0];
-        scheduler.answer(Choice::Ok);
+        scheduler.answer_card(&mut card, Choice::Ok);
     }
 
     #[test]
     fn test_learn() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
         // Fail it
         scheduler.config.learn_steps = vec![0.5, 3.0, 10.0];
-        scheduler.answer(Choice::Again);
+        scheduler.answer(&mut card, Choice::Again);
         // Got 3 steps before graduation
-        assert_eq!(scheduler.card.remaining_steps % 1_000, 3);
-        assert_eq!(scheduler.card.remaining_steps / 1_000, 3);
+        assert_eq!(card.remaining_steps % 1_000, 3);
+        assert_eq!(card.remaining_steps / 1_000, 3);
         // Due in 30 seconds
-        let t1 = scheduler.card.due - Timestamp::now();
+        let t1 = card.due - Timestamp::now();
         assert!(t1 >= 25 && t1 <= 40);
 
         // Pass it once
-        scheduler.answer(Choice::Ok);
+        scheduler.answer(&mut card, Choice::Ok);
         // Due in 3 minutes
-        let t2 = scheduler.card.due - Timestamp::now();
+        let t2 = card.due - Timestamp::now();
         assert!(t2 >= 178 && t2 <= 225);
-        assert_eq!(scheduler.card.remaining_steps % 1_000, 2);
-        assert_eq!(scheduler.card.remaining_steps / 1_000, 2);
+        assert_eq!(card.remaining_steps % 1_000, 2);
+        assert_eq!(card.remaining_steps / 1_000, 2);
 
         // Pass again
-        scheduler.answer(Choice::Ok);
+        scheduler.answer(&mut card, Choice::Ok);
         // Due in 10 minutes
-        let t3 = scheduler.card.due - Timestamp::now();
+        let t3 = card.due - Timestamp::now();
         assert!(t3 >= 599 && t3 <= 750);
-        assert_eq!(scheduler.card.remaining_steps % 1_000, 1);
-        assert_eq!(scheduler.card.remaining_steps / 1_000, 1);
+        assert_eq!(card.remaining_steps % 1_000, 1);
+        assert_eq!(card.remaining_steps / 1_000, 1);
 
         // Graduate the card
-        assert!(matches!(scheduler.card.card_type, CardType::Learn));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
-        scheduler.answer(Choice::Ok);
-        assert!(matches!(scheduler.card.card_type, CardType::Review));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        assert!(matches!(card.card_type, CardType::Learn));
+        assert!(matches!(card.card_queue, CardQueue::Learn));
+        scheduler.answer(&mut card, Choice::Ok);
+        assert!(matches!(card.card_type, CardType::Review));
+        assert!(matches!(card.card_queue, CardQueue::Review));
         // Due tomorrow with interval of 1
-        assert_eq!(scheduler.card.due, scheduler.day_today + 1);
-        assert_eq!(scheduler.card.interval, 1);
+        assert_eq!(card.due, scheduler.day_today + 1);
+        assert_eq!(card.interval, 1);
         // Or normal removal
-        scheduler.card.card_type = CardType::New;
-        scheduler.card.card_queue = CardQueue::Learn;
-        scheduler.answer(Choice::Easy);
-        assert!(matches!(scheduler.card.card_type, CardType::Review));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert!(check_interval(&scheduler.card, 4));
+        card.card_type = CardType::New;
+        card.card_queue = CardQueue::Learn;
+        scheduler.answer(&mut card, Choice::Easy);
+        assert!(matches!(card.card_type, CardType::Review));
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert!(check_interval(&card, 4));
     }
 
     #[test]
     fn test_initial_hard() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
-        scheduler.answer(Choice::Hard);
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
+
+        scheduler.answer(&mut card, Choice::Hard);
         let expected = Timestamp::now() + 330;
-        assert!(
-            scheduler.card.due >= expected - 10
-                && scheduler.card.due <= (expected as f32 * 1.25) as i64
-        );
+        assert!(card.due >= expected - 10 && card.due <= (expected as f32 * 1.25) as i64);
     }
 
     #[test]
     fn test_relearn() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
-        scheduler.card.interval = 100;
-        scheduler.card.due = scheduler.day_today;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.card_type = CardType::Review;
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
+
+        card.interval = 100;
+        card.due = scheduler.day_today;
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
 
         // Fail the card
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
-        assert_eq!(scheduler.card.interval, 1);
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.card_type, CardType::Relearn));
+        assert!(matches!(card.card_queue, CardQueue::Learn));
+        assert_eq!(card.interval, 1);
 
         // Immediately graduate it
-        scheduler.answer(Choice::Easy);
-        assert!(matches!(scheduler.card.card_type, CardType::Review));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert_eq!(scheduler.card.interval, 2);
-        assert_eq!(
-            scheduler.card.due,
-            scheduler.day_today + scheduler.card.interval as i64
-        );
+        scheduler.answer(&mut card, Choice::Easy);
+        assert!(matches!(card.card_type, CardType::Review));
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert_eq!(card.interval, 2);
+        assert_eq!(card.due, scheduler.day_today + card.interval as i64);
     }
 
     #[test]
     fn test_relearn_no_steps() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
-        scheduler.card.interval = 100;
-        scheduler.card.due = scheduler.day_today;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.card_type = CardType::Review;
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
+
+        card.interval = 100;
+        card.due = scheduler.day_today;
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
 
         scheduler.config.relearn_steps = vec![];
         // Fail the card
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.card_type, CardType::Review));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.card_type, CardType::Review));
+        assert!(matches!(card.card_queue, CardQueue::Review));
     }
 
     #[test]
     fn test_learn_day() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
         scheduler.config.learn_steps = vec![1.0, 10.0, 1440.0, 2880.0];
 
         // Pass it
-        scheduler.answer(Choice::Ok);
-        assert_eq!(scheduler.card.remaining_steps % 1_000, 3);
-        assert_eq!(scheduler.card.remaining_steps / 1_000, 1);
-        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400);
+        scheduler.answer(&mut card, Choice::Ok);
+        assert_eq!(card.remaining_steps % 1_000, 3);
+        assert_eq!(card.remaining_steps / 1_000, 1);
+        assert_eq!(scheduler.next_interval(&mut card, Choice::Ok), 86_400);
 
         // Learn it
-        scheduler.answer(Choice::Ok);
-        assert_eq!(scheduler.card.due, scheduler.day_today + 1);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::DayLearn));
+        scheduler.answer(&mut card, Choice::Ok);
+        assert_eq!(card.due, scheduler.day_today + 1);
+        assert!(matches!(card.card_queue, CardQueue::DayLearn));
 
         // Move back a day
-        scheduler.card.due -= 1;
-        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400 * 2);
+        card.due -= 1;
+        assert_eq!(scheduler.next_interval(&mut card, Choice::Ok), 86_400 * 2);
 
         // Fail to answer it
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.card_queue, CardQueue::Learn));
 
         // Ok to answer it
-        scheduler.answer(Choice::Ok);
-        assert_eq!(scheduler.next_interval(Choice::Ok), 86_400);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+        scheduler.answer(&mut card, Choice::Ok);
+        assert_eq!(scheduler.next_interval(&mut card, Choice::Ok), 86_400);
+        assert!(matches!(card.card_queue, CardQueue::Learn));
     }
 
     #[test]
     fn test_review() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        scheduler.card.card_type = CardType::Review;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.due = scheduler.day_today - 8;
-        scheduler.card.ease_factor = INITIAL_EASE_FACTOR;
-        scheduler.card.reps = 3;
-        scheduler.card.lapses = 1;
-        scheduler.card.interval = 100;
+        card.card_type = CardType::Review;
+        card.card_queue = CardQueue::Review;
+        card.due = scheduler.day_today - 8;
+        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.reps = 3;
+        card.lapses = 1;
+        card.interval = 100;
 
-        let card_copy = scheduler.card.clone();
+        let card_copy = card.clone();
 
         // Hard
-        scheduler.answer(Choice::Hard);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert!(check_interval(&scheduler.card, 120));
-        assert_eq!(
-            scheduler.card.due,
-            scheduler.day_today + scheduler.card.interval as i64
-        );
-        assert_eq!(scheduler.card.ease_factor, 2_350);
-        assert_eq!(scheduler.card.lapses, 1);
-        assert_eq!(scheduler.card.reps, 4);
+        scheduler.answer(&mut card, Choice::Hard);
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert!(check_interval(&card, 120));
+        assert_eq!(card.due, scheduler.day_today + card.interval as i64);
+        assert_eq!(card.ease_factor, 2_350);
+        assert_eq!(card.lapses, 1);
+        assert_eq!(card.reps, 4);
 
         // Ok
-        scheduler.card = card_copy.clone();
-        scheduler.answer(Choice::Ok);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert!(check_interval(&scheduler.card, 260));
-        assert_eq!(
-            scheduler.card.due,
-            scheduler.day_today + scheduler.card.interval as i64
-        );
-        assert_eq!(scheduler.card.ease_factor, INITIAL_EASE_FACTOR);
+        card = card_copy.clone();
+        scheduler.answer(&mut card, Choice::Ok);
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert!(check_interval(&card, 260));
+        assert_eq!(card.due, scheduler.day_today + card.interval as i64);
+        assert_eq!(card.ease_factor, INITIAL_EASE_FACTOR);
 
         // Easy
-        scheduler.card = card_copy.clone();
-        scheduler.answer(Choice::Easy);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert!(check_interval(&scheduler.card, 351));
-        assert_eq!(
-            scheduler.card.due,
-            scheduler.day_today + scheduler.card.interval as i64
-        );
-        assert_eq!(scheduler.card.ease_factor, 2_650);
+        card = card_copy.clone();
+        scheduler.answer(&mut card, Choice::Easy);
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert!(check_interval(&card, 351));
+        assert_eq!(card.due, scheduler.day_today + card.interval as i64);
+        assert_eq!(card.ease_factor, 2_650);
 
         // Leech
-        scheduler.card = card_copy.clone();
-        scheduler.card.lapses = 7;
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Suspended));
+        card = card_copy.clone();
+        card.lapses = 7;
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.card_queue, CardQueue::Suspended));
     }
 
     #[test]
     fn test_spacing_button() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
-        scheduler.card.card_type = CardType::Review;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.due = scheduler.day_today;
-        scheduler.card.reps = 1;
-        scheduler.card.interval = 1;
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        assert_eq!(scheduler.next_interval_string(Choice::Hard), "2d");
-        assert_eq!(scheduler.next_interval_string(Choice::Ok), "3d");
-        assert_eq!(scheduler.next_interval_string(Choice::Easy), "4d");
+        card.card_type = CardType::Review;
+        card.card_queue = CardQueue::Review;
+        card.due = scheduler.day_today;
+        card.reps = 1;
+        card.interval = 1;
+
+        assert_eq!(
+            scheduler.next_interval_string(&mut card, Choice::Hard),
+            "2d"
+        );
+        assert_eq!(scheduler.next_interval_string(&mut card, Choice::Ok), "3d");
+        assert_eq!(
+            scheduler.next_interval_string(&mut card, Choice::Easy),
+            "4d"
+        );
 
         // Hard multiplier = 1, not increase day
         scheduler.config.hard_multiplier = 1.0;
-        assert_eq!(scheduler.next_interval_string(Choice::Hard), "1d");
+        assert_eq!(
+            scheduler.next_interval_string(&mut card, Choice::Hard),
+            "1d"
+        );
     }
 
     #[test]
     fn test_bury() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        scheduler.bury_card();
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Buried));
+        scheduler.bury_card(&mut card);
+        assert!(matches!(card.card_queue, CardQueue::Buried));
 
-        scheduler.unbury_card();
-        assert!(matches!(scheduler.card.card_queue, CardQueue::New));
+        scheduler.unbury_card(&mut card);
+        assert!(matches!(card.card_queue, CardQueue::New));
     }
 
     #[test]
     fn test_suspend() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        scheduler.card.due = scheduler.day_today;
-        scheduler.card.interval = 100;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.card_type = CardType::Review;
+        card.due = scheduler.day_today;
+        card.interval = 100;
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
 
-        scheduler.answer(Choice::Again);
-        assert!(scheduler.card.due > Timestamp::now());
-        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(card.due > Timestamp::now());
+        assert!(matches!(card.card_type, CardType::Relearn));
+        assert!(matches!(card.card_queue, CardQueue::Learn));
 
-        let due = scheduler.card.due;
-        scheduler.suspend_card();
-        scheduler.unsuspend_card();
+        let due = card.due;
+        scheduler.suspend_card(&mut card);
+        scheduler.unsuspend_card(&mut card);
 
-        assert!(matches!(scheduler.card.card_type, CardType::Relearn));
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Learn));
-        assert_eq!(scheduler.card.due, due);
+        assert!(matches!(card.card_type, CardType::Relearn));
+        assert!(matches!(card.card_queue, CardQueue::Learn));
+        assert_eq!(card.due, due);
     }
 
     #[test]
     fn test_reschedule() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        scheduler.schedule_card_as_review(0, 0);
-        assert_eq!(scheduler.card.due, scheduler.day_today);
-        assert_eq!(scheduler.card.interval, 1);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::Review));
-        assert!(matches!(scheduler.card.card_type, CardType::Review));
+        scheduler.schedule_card_as_review(&mut card, 0, 0);
+        assert_eq!(card.due, scheduler.day_today);
+        assert_eq!(card.interval, 1);
+        assert!(matches!(card.card_queue, CardQueue::Review));
+        assert!(matches!(card.card_type, CardType::Review));
 
-        scheduler.schedule_card_as_review(1, 1);
-        assert_eq!(scheduler.card.due, scheduler.day_today + 1);
-        assert_eq!(scheduler.card.interval, 1);
+        scheduler.schedule_card_as_review(&mut card, 1, 1);
+        assert_eq!(card.due, scheduler.day_today + 1);
+        assert_eq!(card.interval, 1);
 
-        scheduler.schedule_card_as_new();
-        assert_eq!(scheduler.card.due, 0);
-        assert!(matches!(scheduler.card.card_queue, CardQueue::New));
-        assert!(matches!(scheduler.card.card_type, CardType::New));
+        scheduler.schedule_card_as_new(&mut card);
+        assert_eq!(card.due, 0);
+        assert!(matches!(card.card_queue, CardQueue::New));
+        assert!(matches!(card.card_type, CardType::New));
     }
 
     #[test]
     fn test_fail_multiple() {
-        let mut scheduler =
-            Scheduler::new(Card::default(), Config::default(), Timestamp::day_cut_off());
+        let mut scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
 
-        scheduler.card.interval = 100;
-        scheduler.card.due = scheduler.day_today - 100;
-        scheduler.card.card_queue = CardQueue::Review;
-        scheduler.card.card_type = CardType::Review;
-        scheduler.card.ease_factor = INITIAL_EASE_FACTOR;
-        scheduler.card.reps = 3;
-        scheduler.card.lapses = 3;
+        card.interval = 100;
+        card.due = scheduler.day_today - 100;
+        card.card_queue = CardQueue::Review;
+        card.card_type = CardType::Review;
+        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.reps = 3;
+        card.lapses = 3;
 
         scheduler.config.lapse_multiplier = 0.5;
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.interval, 50));
-        scheduler.answer(Choice::Again);
-        assert!(matches!(scheduler.card.interval, 25));
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.interval, 50));
+        scheduler.answer(&mut card, Choice::Again);
+        assert!(matches!(card.interval, 25));
     }
 }
