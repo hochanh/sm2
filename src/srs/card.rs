@@ -54,9 +54,10 @@ impl Default for Card {
 
 impl Card {
     pub fn new(due: i64) -> Self {
-        let mut card = Card::default();
-        card.due = due;
-        card
+        Card {
+            due,
+            ..Card::default()
+        }
     }
 
     pub fn schedule_as_new(&mut self, position: i64) {
@@ -94,6 +95,7 @@ mod tests {
     #[test]
     fn test_set_new_position() {
         let mut card = Card::default();
+        assert_eq!(card.due, 0);
         card.set_new_position(1);
         assert_eq!(card.due, 1);
 

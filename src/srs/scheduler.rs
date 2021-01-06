@@ -19,6 +19,9 @@ pub enum Choice {
 trait Sched {
     fn answer_card(&mut self, choice: Choice);
 
+    fn next_interval(&self, choice: Choice) -> i32;
+    fn next_interval_string(&self, choice: Choice) -> String;
+
     fn bury_card(&mut self);
     fn unbury_card(&mut self);
 
@@ -74,6 +77,31 @@ impl Scheduler {
 impl Sched for Scheduler {
     fn answer_card(&mut self, choice: Choice) {
         self.answer(choice);
+    }
+
+    fn next_interval(&self, choice: Choice) -> i32 {
+        match self.card.card_queue {
+            CardQueue::New | CardQueue::Learn | CardQueue::DayLearn => {
+                self.next_learn_interval(choice)
+            }
+            _ => {
+                if matches!(choice, Choice::Again) {
+                    let steps = &self.config.relearn_steps;
+                    if !steps.is_empty() {
+                        (steps[0] * 60.0) as i32
+                    } else {
+                        self.lapse_interval() * 86_400
+                    }
+                } else {
+                    self.next_review_interval(choice, false) * 86_400
+                }
+            }
+        }
+    }
+
+    fn next_interval_string(&self, choice: Choice) -> String {
+        let interval_secs = self.next_interval(choice);
+        answer_button_time(interval_secs as f32)
     }
 
     fn bury_card(&mut self) {
@@ -442,26 +470,6 @@ impl Scheduler {
         self.reschedule_learn_card(steps, None)
     }
 
-    fn next_interval(&self, choice: Choice) -> i32 {
-        match self.card.card_queue {
-            CardQueue::New | CardQueue::Learn | CardQueue::DayLearn => {
-                self.next_learn_interval(choice)
-            }
-            _ => {
-                if matches!(choice, Choice::Again) {
-                    let steps = &self.config.relearn_steps;
-                    if !steps.is_empty() {
-                        (steps[0] * 60.0) as i32
-                    } else {
-                        self.lapse_interval() * 86_400
-                    }
-                } else {
-                    self.next_review_interval(choice, false) * 86_400
-                }
-            }
-        }
-    }
-
     fn next_learn_interval(&self, choice: Choice) -> i32 {
         let steps = &self.config.learn_steps;
         match choice {
@@ -484,11 +492,6 @@ impl Scheduler {
                 }
             }
         }
-    }
-
-    fn next_interval_string(&self, choice: Choice) -> String {
-        let interval_secs = self.next_interval(choice);
-        answer_button_time(interval_secs as f32)
     }
 }
 
