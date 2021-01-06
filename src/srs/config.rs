@@ -1,5 +1,3 @@
-pub const INITIAL_EASE_FACTOR: i32 = 2_500; // 250%
-
 #[derive(Clone)]
 pub enum NewCardOrder {
     Due = 0,
@@ -20,7 +18,7 @@ pub struct Config {
     pub bury_new: bool,
     pub bury_reviews: bool,
 
-    pub initial_ease: f32,
+    pub initial_ease: i32,
 
     pub easy_multiplier: f32,
     pub hard_multiplier: f32,
@@ -48,7 +46,7 @@ impl Default for Config {
             reviews_per_day: 200,
             bury_new: false,
             bury_reviews: false,
-            initial_ease: 2.5,
+            initial_ease: 2_500,
             easy_multiplier: 1.3,
             hard_multiplier: 1.2,
             lapse_multiplier: 0.0,

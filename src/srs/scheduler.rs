@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::service::timespan::answer_button_time;
 use crate::service::timestamp::Timestamp;
 use crate::srs::card::{Card, CardQueue, CardType};
-use crate::srs::config::{Config, INITIAL_EASE_FACTOR};
+use crate::srs::config::Config;
 
 #[derive(Clone, Copy)]
 pub enum Choice {
@@ -129,14 +129,14 @@ impl Sched for Scheduler {
     }
 
     fn schedule_card_as_new(&self, card: &mut Card) {
-        card.schedule_as_new(0);
+        card.schedule_as_new(0, self.config.initial_ease);
     }
 
     fn schedule_card_as_review(&self, card: &mut Card, min_days: i32, max_days: i32) {
         let mut rng = rand::thread_rng();
         let distribution = Uniform::from(min_days..=max_days);
         let interval = distribution.sample(&mut rng);
-        card.schedule_as_review(interval, self.day_today);
+        card.schedule_as_review(interval, self.day_today, self.config.initial_ease);
     }
 }
 
@@ -228,7 +228,7 @@ impl Scheduler {
     fn reschedule_new(&self, card: &mut Card, early: bool) {
         card.interval = self.graduating_interval(card, early, true);
         card.due = self.day_today + card.interval as i64;
-        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.ease_factor = self.config.initial_ease;
         card.card_queue = CardQueue::Review;
         card.card_type = CardType::Review;
     }
@@ -660,7 +660,7 @@ mod tests {
         card.card_type = CardType::Review;
         card.card_queue = CardQueue::Review;
         card.due = scheduler.day_today - 8;
-        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.ease_factor = 2_500;
         card.reps = 3;
         card.lapses = 1;
         card.interval = 100;
@@ -682,7 +682,7 @@ mod tests {
         assert!(matches!(card.card_queue, CardQueue::Review));
         assert!(check_interval(&card, 260));
         assert_eq!(card.due, scheduler.day_today + card.interval as i64);
-        assert_eq!(card.ease_factor, INITIAL_EASE_FACTOR);
+        assert_eq!(card.ease_factor, 2_500);
 
         // Easy
         card = card_copy.clone();
@@ -794,7 +794,7 @@ mod tests {
         card.due = scheduler.day_today - 100;
         card.card_queue = CardQueue::Review;
         card.card_type = CardType::Review;
-        card.ease_factor = INITIAL_EASE_FACTOR;
+        card.ease_factor = 2_500;
         card.reps = 3;
         card.lapses = 3;
 
