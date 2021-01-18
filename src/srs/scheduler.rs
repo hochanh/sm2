@@ -3,10 +3,10 @@ use std::cmp::{max, min};
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 
-use crate::service::timespan::answer_button_time;
-use crate::service::timestamp::Timestamp;
 use crate::srs::card::{Card, CardQueue, CardType};
 use crate::srs::config::Config;
+use crate::svc::timespan::answer_button_time;
+use crate::svc::timestamp::Timestamp;
 
 #[derive(Clone, Copy)]
 pub enum Choice {
@@ -490,8 +490,8 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::timestamp::Timestamp;
     use crate::srs::card::CardType;
+    use crate::svc::timestamp::Timestamp;
 
     use super::*;
 

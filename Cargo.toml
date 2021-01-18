@@ -1,7 +1,6 @@
 [package]
 name = "sm2"
 version = "0.1.0"
-authors = ["manhtai <vo@manhtai.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,8 +8,8 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 rand = "0.8"
+getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen = "0.2"
 
-[dev-dependencies.cargo-husky]
-version = "1"
-default-features = false
-features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy", "run-cargo-check", "run-cargo-fmt"]
+[lib]
+crate-type = ["cdylib"]
