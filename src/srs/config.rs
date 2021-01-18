@@ -1,4 +1,6 @@
-#[derive(Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub learn_steps: Vec<f32>,
     pub relearn_steps: Vec<f32>,

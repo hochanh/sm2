@@ -2,13 +2,14 @@ use std::cmp::{max, min};
 
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use crate::srs::card::{Card, CardQueue, CardType};
 use crate::srs::config::Config;
 use crate::svc::timespan::answer_button_time;
 use crate::svc::timestamp::Timestamp;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum Choice {
     Again = 1,
     Hard = 2,
@@ -16,7 +17,7 @@ pub enum Choice {
     Easy = 4,
 }
 
-trait Sched {
+pub trait Sched {
     fn next_interval(&self, card: &Card, choice: Choice) -> i32;
     fn next_interval_string(&self, card: &Card, choice: Choice) -> String;
 
