@@ -3,7 +3,7 @@ SM2
 
 > SuperMemo2 algorithm, written in Rust
 
-Large part of the code in this folder was ported from [Anki][1], which
+Large part of the code in this repo was ported from [Anki][1], which
 implements [SM2][2] algorithm.
 
 
