@@ -15,5 +15,10 @@ rand = "0.8"
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
 
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false
+features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy", "run-cargo-check", "run-cargo-fmt"]
+
 [lib]
 crate-type = ["cdylib"]
