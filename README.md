@@ -59,7 +59,7 @@ const main = async () => {
 }
 ```
 
-See [./src/lib.rs][lib.rs] for full API.
+See [lib.rs](src/lib.rs) for full API.
 
 
 [1]: https://github.com/ankitects/anki
