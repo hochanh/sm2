@@ -2,14 +2,16 @@ use std::cmp::{max, min};
 
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 
 use crate::srs::card::{Card, CardQueue, CardType};
 use crate::srs::config::Config;
 use crate::svc::timespan::answer_button_time;
 use crate::svc::timestamp::Timestamp;
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+#[derive(Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(i8)]
 pub enum Choice {
     Again = 1,
     Hard = 2,

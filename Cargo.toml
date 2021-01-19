@@ -14,7 +14,11 @@ chrono = "0.4"
 rand = "0.8"
 getrandom = { version = "0.2", features = ["js"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_repr = "0.1"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+
+[dev-dependencies]
+console_error_panic_hook = "0.1.6"
 
 # Why? https://github.com/rustwasm/wasm-pack/issues/793
 [package.metadata.wasm-pack.profile.release]
