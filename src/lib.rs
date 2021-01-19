@@ -36,7 +36,7 @@ impl Sm2 {
 
 #[wasm_bindgen]
 impl Sm2 {
-    pub fn next_interval(&self, card: &JsValue, choice: &JsValue) -> i32 {
+    pub fn next_interval(&self, card: &JsValue, choice: &JsValue) -> i64 {
         let card: Card = card.into_serde().unwrap();
         let choice: Choice = choice.into_serde().unwrap();
         self.scheduler.next_interval(&card, choice)

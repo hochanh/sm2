@@ -20,7 +20,7 @@ pub enum Choice {
 }
 
 pub trait Sched {
-    fn next_interval(&self, card: &Card, choice: Choice) -> i32;
+    fn next_interval(&self, card: &Card, choice: Choice) -> i64;
     fn next_interval_string(&self, card: &Card, choice: Choice) -> String;
 
     fn answer_card(&self, card: &mut Card, choice: Choice);
@@ -76,21 +76,21 @@ impl Scheduler {
 }
 
 impl Sched for Scheduler {
-    fn next_interval(&self, card: &Card, choice: Choice) -> i32 {
+    fn next_interval(&self, card: &Card, choice: Choice) -> i64 {
         match card.card_queue {
             CardQueue::New | CardQueue::Learn | CardQueue::DayLearn => {
-                self.next_learn_interval(card, choice)
+                self.next_learn_interval(card, choice) as i64
             }
             _ => {
                 if matches!(choice, Choice::Again) {
                     let steps = &self.config.relearn_steps;
                     if !steps.is_empty() {
-                        (steps[0] * 60.0) as i32
+                        (steps[0] * 60.0) as i64
                     } else {
-                        self.lapse_interval(card) * 86_400
+                        self.lapse_interval(card) as i64 * 86_400
                     }
                 } else {
-                    self.next_review_interval(card, choice, false) * 86_400
+                    self.next_review_interval(card, choice, false) as i64 * 86_400
                 }
             }
         }
@@ -806,5 +806,16 @@ mod tests {
         assert!(matches!(card.interval, 50));
         scheduler.answer(&mut card, Choice::Again);
         assert!(matches!(card.interval, 25));
+    }
+
+    #[test]
+    fn test_ok_multiple_times() {
+        let scheduler = Scheduler::new(Config::default(), Timestamp::day_cut_off());
+        let mut card = Card::default();
+
+        for _ in 1..1000 {
+            scheduler.answer(&mut card, Choice::Ok);
+            assert!(scheduler.next_interval(&card, Choice::Ok) > 0);
+        }
     }
 }
