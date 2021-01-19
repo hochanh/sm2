@@ -4,7 +4,6 @@ use wasm_bindgen::prelude::*;
 use crate::srs::card::Card;
 use crate::srs::config::Config;
 use crate::srs::scheduler::{Choice, Sched, Scheduler};
-use crate::svc::timestamp::Timestamp;
 
 // Import 'window.alert'
 #[wasm_bindgen]
@@ -26,10 +25,10 @@ pub struct Sm2 {
 #[wasm_bindgen]
 impl Sm2 {
     #[wasm_bindgen(constructor)]
-    pub fn new(config: &JsValue) -> Self {
+    pub fn new(config: &JsValue, day_cut_off: i64) -> Self {
         let config: Config = config.into_serde().unwrap();
         Self {
-            scheduler: Scheduler::new(config, Timestamp::day_cut_off()),
+            scheduler: Scheduler::new(config, day_cut_off),
         }
     }
 }
