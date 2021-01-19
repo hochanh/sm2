@@ -1,13 +1,11 @@
 [package]
 name = "sm2"
-version = "0.0.0-next2"
+version = "0.0.1"
 edition = "2018"
 
 description = "SuperMemo2 written in Rust, compiled to WebAssembly"
 repository = "https://github.com/repeatnotes/sm2"
 license = "AGPL"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = { version = "0.4", features = ["wasmbind"]}
