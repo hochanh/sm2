@@ -1,19 +1,26 @@
 [package]
 name = "sm2"
-version = "0.0.0-next2"
+version = "0.0.1"
 edition = "2018"
 
 description = "SuperMemo2 written in Rust, compiled to WebAssembly"
 repository = "https://github.com/repeatnotes/sm2"
 license = "AGPL"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-chrono = "0.4"
+chrono = { version = "0.4", features = ["wasmbind"]}
 rand = "0.8"
 getrandom = { version = "0.2", features = ["js"] }
-wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_repr = "0.1"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+
+[dev-dependencies]
+console_error_panic_hook = "0.1.6"
+
+# Why? https://github.com/rustwasm/wasm-pack/issues/793
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
 
 [dev-dependencies.cargo-husky]
 version = "1"

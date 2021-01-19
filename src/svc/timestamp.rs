@@ -1,17 +1,15 @@
-use std::time;
-
 use chrono::{DateTime, Duration, FixedOffset, Local, TimeZone, Utc};
 
 pub struct Timestamp(i64);
 
 impl Timestamp {
     pub fn now() -> i64 {
-        now().as_secs() as i64
+        now()
     }
 
     pub fn day_cut_off() -> i64 {
         get_next_day(
-            now().as_secs() as i64,
+            now(),
             local_minutes_west_for_stamp(Utc::now().timestamp()),
             4,
         )
@@ -19,10 +17,8 @@ impl Timestamp {
     }
 }
 
-pub fn now() -> time::Duration {
-    time::SystemTime::now()
-        .duration_since(time::SystemTime::UNIX_EPOCH)
-        .unwrap()
+pub fn now() -> i64 {
+    Utc::now().timestamp()
 }
 
 /// - now_secs is a timestamp of the current time

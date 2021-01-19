@@ -8,7 +8,10 @@ use crate::srs::config::Config;
 use crate::svc::timespan::answer_button_time;
 use crate::svc::timestamp::Timestamp;
 
-#[derive(Clone, Copy)]
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+#[derive(Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(i8)]
 pub enum Choice {
     Again = 1,
     Hard = 2,
@@ -16,7 +19,7 @@ pub enum Choice {
     Easy = 4,
 }
 
-trait Sched {
+pub trait Sched {
     fn next_interval(&self, card: &Card, choice: Choice) -> i32;
     fn next_interval_string(&self, card: &Card, choice: Choice) -> String;
 

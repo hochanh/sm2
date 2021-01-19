@@ -1,4 +1,8 @@
-#[derive(PartialEq, Clone)]
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+#[derive(PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(i8)]
 pub enum CardType {
     New = 0,
     Learn = 1,
@@ -6,7 +10,8 @@ pub enum CardType {
     Relearn = 3,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(i8)]
 pub enum CardQueue {
     // due is the order cards are shown in
     New = 0,
@@ -23,7 +28,7 @@ pub enum CardQueue {
     Buried = -2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Card {
     pub card_type: CardType,
     pub card_queue: CardQueue,
