@@ -450,7 +450,7 @@ impl Scheduler {
         let left = (remaining % 1_000) as usize;
         let delay = if steps.is_empty() {
             1.0
-        } else if steps.len() >= left {
+        } else if steps.len() >= left && left > 0 {
             steps[steps.len() - left]
         } else {
             steps[0]
@@ -817,5 +817,9 @@ mod tests {
             scheduler.answer(&mut card, Choice::Ok);
             assert!(scheduler.next_interval(&card, Choice::Ok) > 0);
         }
+
+        scheduler.answer(&mut card, Choice::Again);
+        scheduler.answer(&mut card, Choice::Hard);
+        assert!(scheduler.next_interval(&card, Choice::Ok) > 0);
     }
 }
