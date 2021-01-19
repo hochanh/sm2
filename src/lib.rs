@@ -47,41 +47,48 @@ impl Sm2 {
         self.scheduler.next_interval_string(&card, choice)
     }
 
-    pub fn answer_card(&self, card: &JsValue, choice: &JsValue) {
+    pub fn answer_card(&self, card: &JsValue, choice: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
         let choice: Choice = choice.into_serde().unwrap();
-        self.scheduler.answer_card(&mut card, choice)
+        self.scheduler.answer_card(&mut card, choice);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn bury_card(&self, card: &JsValue) {
+    pub fn bury_card(&self, card: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
-        self.scheduler.bury_card(&mut card)
+        self.scheduler.bury_card(&mut card);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn unbury_card(&self, card: &JsValue) {
+    pub fn unbury_card(&self, card: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
-        self.scheduler.unbury_card(&mut card)
+        self.scheduler.unbury_card(&mut card);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn suspend_card(&self, card: &JsValue) {
+    pub fn suspend_card(&self, card: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
-        self.scheduler.suspend_card(&mut card)
+        self.scheduler.suspend_card(&mut card);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn unsuspend_card(&self, card: &JsValue) {
+    pub fn unsuspend_card(&self, card: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
-        self.scheduler.unsuspend_card(&mut card)
+        self.scheduler.unsuspend_card(&mut card);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn schedule_card_as_new(&self, card: &JsValue) {
+    pub fn schedule_card_as_new(&self, card: &JsValue) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
-        self.scheduler.schedule_card_as_new(&mut card)
+        self.scheduler.schedule_card_as_new(&mut card);
+        JsValue::from_serde(&card).unwrap()
     }
 
-    pub fn schedule_card_as_review(&self, card: &JsValue, min_days: i32, max_days: i32) {
+    pub fn schedule_card_as_review(&self, card: &JsValue, min_days: i32, max_days: i32) -> JsValue {
         let mut card: Card = card.into_serde().unwrap();
         self.scheduler
-            .schedule_card_as_review(&mut card, min_days, max_days)
+            .schedule_card_as_review(&mut card, min_days, max_days);
+        JsValue::from_serde(&card).unwrap()
     }
 }
 
