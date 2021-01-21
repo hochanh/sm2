@@ -91,6 +91,14 @@ impl Sm2 {
             .schedule_card_as_review(&mut card, min_days, max_days);
         JsValue::from_serde(&card).unwrap()
     }
+
+    pub fn day_cut_off(&self) -> i64 {
+        self.scheduler.day_cut_off
+    }
+
+    pub fn day_today(&self) -> i64 {
+        self.scheduler.day_today
+    }
 }
 
 pub mod srs;

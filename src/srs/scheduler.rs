@@ -36,9 +36,9 @@ pub trait Sched {
 }
 
 pub struct Scheduler {
-    config: Config,
-    day_cut_off: i64,
-    day_today: i64,
+    pub config: Config,
+    pub day_cut_off: i64,
+    pub day_today: i64,
 }
 
 impl Scheduler {
